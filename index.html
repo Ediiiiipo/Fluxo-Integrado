@@ -1,0 +1,2131 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shopee - Planejamento Fluxo Integrado</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="redesign-improvements.css" />
+    <link rel="stylesheet" href="license-styles.css" />
+    <style>
+      /* ===== ESTILOS DOS CICLOS ===== */
+      .ciclos-container {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin-bottom: 15px;
+        border: 1px solid #dee2e6;
+      }
+      
+      .ciclos-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+      
+      .ciclos-titulo {
+        font-weight: 600;
+        color: #495057;
+        font-size: 14px;
+      }
+      
+      .ciclos-cards {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      
+      .ciclo-card {
+        background: white;
+        border-radius: 8px;
+        padding: 10px 16px;
+        min-width: 120px;
+        text-align: center;
+        border: 2px solid #e9ecef;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      
+      .ciclo-card:hover {
+        border-color: #F65E2D;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(246, 94, 45, 0.15);
+      }
+      
+      .ciclo-card.ativo {
+        border-color: #F65E2D;
+        background: linear-gradient(135deg, #fff5f2 0%, #ffe8e0 100%);
+      }
+      
+      .ciclo-nome {
+        font-weight: 700;
+        font-size: 16px;
+        color: #F65E2D;
+        margin-bottom: 4px;
+      }
+      
+      .ciclo-horario {
+        font-size: 12px;
+        color: #6c757d;
+        margin-bottom: 4px;
+      }
+      
+      .ciclo-capacidade {
+        font-size: 13px;
+        font-weight: 600;
+        color: #28a745;
+      }
+      
+      .sem-ciclos {
+        color: #999;
+        font-style: italic;
+        padding: 10px;
+      }
+      
+      /* Card AM */
+      .ciclo-card[data-ciclo="AM"] .ciclo-nome { color: #007bff; }
+      .ciclo-card[data-ciclo="AM"]:hover { border-color: #007bff; }
+      .ciclo-card[data-ciclo="AM"].ativo { 
+        border-color: #007bff; 
+        background: linear-gradient(135deg, #f0f7ff 0%, #e0efff 100%);
+      }
+      
+      /* Card PM1 */
+      .ciclo-card[data-ciclo="PM1"] .ciclo-nome { color: #fd7e14; }
+      .ciclo-card[data-ciclo="PM1"]:hover { border-color: #fd7e14; }
+      .ciclo-card[data-ciclo="PM1"].ativo { 
+        border-color: #fd7e14; 
+        background: linear-gradient(135deg, #fff8f0 0%, #ffeed9 100%);
+      }
+      
+      /* Card PM2 */
+      .ciclo-card[data-ciclo="PM2"] .ciclo-nome { color: #6f42c1; }
+      .ciclo-card[data-ciclo="PM2"]:hover { border-color: #6f42c1; }
+      .ciclo-card[data-ciclo="PM2"].ativo { 
+        border-color: #6f42c1; 
+        background: linear-gradient(135deg, #f8f4ff 0%, #ede4ff 100%);
+      }
+      
+      /* ===== ESTILOS TEMPO DE CORTE ===== */
+      .tempo-corte-ok {
+        color: #28a745;
+        font-weight: 700;
+        background: #d4edda;
+        padding: 2px 8px;
+        border-radius: 4px;
+      }
+      
+      .tempo-corte-atrasado {
+        color: #dc3545;
+        font-weight: 700;
+        background: #f8d7da;
+        padding: 2px 8px;
+        border-radius: 4px;
+      }
+      
+      /* LH dentro do limite de corte */
+      .lh-dentro-limite {
+        background-color: #e8f5e9 !important;
+      }
+      
+      .lh-dentro-limite:hover {
+        background-color: #c8e6c9 !important;
+      }
+      
+      /* Botão Sugerir Planejamento */
+      .btn-success {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        color: white;
+        border: none;
+        font-weight: 600;
+      }
+      
+      .btn-success:hover {
+        background: linear-gradient(135deg, #218838 0%, #1ba87e 100%);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+      }
+      
+      /* Info de sugestão */
+      .sugestao-info {
+        background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+        border: 1px solid #28a745;
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin-bottom: 15px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      
+      .sugestao-info-texto {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      
+      .sugestao-info-titulo {
+        font-weight: 700;
+        color: #155724;
+      }
+      
+      .sugestao-info-detalhe {
+        font-size: 13px;
+        color: #155724;
+      }
+      
+      .sugestao-info-cap {
+        font-size: 24px;
+        font-weight: 700;
+        color: #28a745;
+      }
+      
+      /* Botão confirmar sugestão */
+      .btn-confirmar-sugestao {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        color: white;
+        border: none;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        white-space: nowrap;
+      }
+      
+      .btn-confirmar-sugestao:hover {
+        background: linear-gradient(135deg, #218838 0%, #1ba87e 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4);
+      }
+      
+      /* ===== BADGES STATUS LH ===== */
+      .badge-status-lh {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      
+      /* P0 - No Piso (verde) */
+      .status-p0 {
+        background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+        color: #155724;
+        border: 1px solid #28a745;
+      }
+      
+      /* P1 - Aguardando Descarga (azul) */
+      .status-p1 {
+        background: linear-gradient(135deg, #cce5ff 0%, #b8daff 100%);
+        color: #004085;
+        border: 1px solid #007bff;
+      }
+      
+      /* P2 - Em Trânsito (amarelo) */
+      .status-p2 {
+        background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+        color: #856404;
+        border: 1px solid #ffc107;
+      }
+      
+      /* P3 - Em transito - fora do prazo (vermelho) */
+      .status-p3 {
+        background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+        color: #721c24;
+        border: 1px solid #dc3545;
+      }
+      
+      /* P0B - Backlog no Piso (cinza) */
+      .status-p0b {
+        background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+        color: #495057;
+        border: 1px solid #6c757d;
+      }
+      
+      /* ===== BADGES TEMPO DE CORTE ===== */
+      .badge-tempo-corte {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: default;
+      }
+      
+      /* OK - Verde (tempo positivo, folga) */
+      .tempo-corte-ok {
+        background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+        color: #155724;
+        border: 1px solid #28a745;
+      }
+      
+      /* Atenção - Amarelo (15-45 min) */
+      .tempo-corte-atencao {
+        background: linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%);
+        color: #856404;
+        border: 1px solid #ffc107;
+      }
+      
+      /* Urgente - Laranja (< 15 min) */
+      .tempo-corte-urgente {
+        background: linear-gradient(135deg, #ffe5d0 0%, #ffd9b8 100%);
+        color: #c35a00;
+        border: 1px solid #fd7e14;
+      }
+      
+      /* Atrasado - Vermelho (negativo) */
+      .tempo-corte-atrasado {
+        background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+        color: #721c24;
+        border: 1px solid #dc3545;
+      }
+      
+      /* Ciclo Encerrado - Cinza */
+      .tempo-corte-encerrado {
+        background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+        color: #495057;
+        border: 1px solid #6c757d;
+        cursor: help;
+      }
+      
+      /* Neutro */
+      .tempo-corte-neutro {
+        background: #f8f9fa;
+        color: #6c757d;
+        border: 1px solid #dee2e6;
+      }
+      
+      /* ===== PAINEL COLAPSÁVEL ===== */
+      .btn-toggle-painel {
+        background: #f0f0f0;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        padding: 8px 12px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.2s ease;
+      }
+      
+      .btn-toggle-painel:hover {
+        background: #e0e0e0;
+      }
+      
+      .btn-toggle-painel.recolhido {
+        transform: rotate(180deg);
+      }
+      
+      .painel-colapsavel {
+        overflow: hidden;
+        transition: all 0.3s ease;
+        max-height: 200px;
+        opacity: 1;
+      }
+      
+      .painel-colapsavel.recolhido {
+        max-height: 0;
+        opacity: 0;
+        margin: 0;
+        padding: 0;
+      }
+      
+      /* ===== STATS GRID MINIMALISTA ===== */
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+      
+      .mini-stat {
+        background: white;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 12px 8px;
+        text-align: center;
+        transition: all 0.2s ease;
+        cursor: default;
+      }
+      
+      .mini-stat:hover {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        transform: translateY(-1px);
+      }
+      
+      .mini-stat-value {
+        display: block;
+        font-size: 20px;
+        font-weight: 700;
+        color: #333;
+        line-height: 1.2;
+      }
+      
+      .mini-stat-label {
+        display: block;
+        font-size: 11px;
+        color: #888;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      
+      .mini-stat.stat-ok { border-left: 3px solid #28a745; }
+      .mini-stat.stat-ok .mini-stat-value { color: #28a745; }
+      
+      .mini-stat.stat-erro { border-left: 3px solid #dc3545; }
+      .mini-stat.stat-erro .mini-stat-value { color: #dc3545; }
+      
+      .mini-stat.stat-sel { border-left: 3px solid #007bff; }
+      .mini-stat.stat-sel .mini-stat-value { color: #007bff; }
+      
+      /* ===== CICLOS COM SELETOR DE DATA ===== */
+      .ciclos-row {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+      
+      .data-ciclo-selector {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: white;
+        padding: 8px 12px;
+        border-radius: 8px;
+        border: 1px solid #e0e0e0;
+      }
+      
+      .data-ciclo-selector label {
+        font-size: 13px;
+        font-weight: 600;
+        color: #666;
+        white-space: nowrap;
+      }
+      
+      .data-ciclo-selector input[type="date"] {
+        padding: 6px 10px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      
+      .data-ciclo-selector input[type="date"]:focus {
+        outline: none;
+        border-color: #007bff;
+        box-shadow: 0 0 0 2px rgba(0,123,255,0.15);
+      }
+      
+      .btn-data-hoje {
+        padding: 6px 12px;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      
+      .btn-data-hoje:hover {
+        background: #0056b3;
+      }
+      
+      .ciclos-grid {
+        flex: 1;
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+        max-width: 400px;
+      }
+      
+      .ciclo-stat {
+        background: white;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 10px 8px;
+        text-align: center;
+        transition: all 0.2s ease;
+        cursor: pointer;
+      }
+      
+      .ciclo-stat:hover {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        transform: translateY(-2px);
+      }
+      
+      .ciclo-stat.ativo {
+        border-color: #007bff;
+        background: #f0f7ff;
+      }
+      
+      .ciclo-stat .ciclo-nome {
+        display: block;
+        font-size: 14px;
+        font-weight: 700;
+        line-height: 1.2;
+      }
+      
+      .ciclo-stat .ciclo-horario {
+        display: block;
+        font-size: 10px;
+        color: #888;
+      }
+      
+      .ciclo-stat .ciclo-cap {
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+        color: #28a745;
+        margin-top: 2px;
+      }
+      
+      /* Cores por ciclo */
+      .ciclo-stat[data-ciclo="AM"] .ciclo-nome { color: #0066cc; }
+      .ciclo-stat[data-ciclo="AM"].ativo { border-color: #0066cc; background: #e6f0ff; }
+      
+      .ciclo-stat[data-ciclo="PM1"] .ciclo-nome { color: #fd7e14; }
+      .ciclo-stat[data-ciclo="PM1"].ativo { border-color: #fd7e14; background: #fff8f0; }
+      
+      .ciclo-stat[data-ciclo="PM2"] .ciclo-nome { color: #6f42c1; }
+      .ciclo-stat[data-ciclo="PM2"].ativo { border-color: #6f42c1; background: #f8f4ff; }
+      
+      .sem-ciclos {
+        grid-column: 1 / -1;
+        text-align: center;
+        color: #999;
+        font-size: 12px;
+        padding: 10px;
+      }
+      
+      /* ===== BARRA DE AÇÕES ===== */
+      .planejamento-selecao-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 15px;
+        padding: 12px 0;
+        border-bottom: 1px solid #eee;
+      }
+      
+      .acoes-esquerda {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      
+      /* ===== BUSCA LH MELHORADA ===== */
+      .busca-lh-container {
+        display: flex;
+        align-items: center;
+        background: white;
+        border: 2px solid #e0e0e0;
+        border-radius: 25px;
+        padding: 6px 14px;
+        transition: all 0.2s ease;
+        min-width: 180px;
+      }
+      
+      .busca-lh-container:focus-within {
+        border-color: #007bff;
+        box-shadow: 0 0 0 3px rgba(0,123,255,0.15);
+      }
+      
+      .busca-icon {
+        font-size: 14px;
+        margin-right: 8px;
+        opacity: 0.6;
+      }
+      
+      .busca-lh-input {
+        border: none;
+        outline: none;
+        font-size: 14px;
+        width: 100%;
+        background: transparent;
+      }
+      
+      .busca-lh-input::placeholder {
+        color: #aaa;
+      }
+      
+      /* ===== MODAL DE TOs ===== */
+      .modal-overlay-to {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+      }
+      
+      .modal-to-content {
+        background: white;
+        border-radius: 12px;
+        width: 95%;
+        max-width: 900px;
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+      }
+      
+      .modal-to-header {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        padding: 16px 20px;
+        border-bottom: 1px solid #e0e0e0;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-radius: 12px 12px 0 0;
+      }
+      
+      .modal-to-header h2 {
+        margin: 0;
+        font-size: 18px;
+        color: #333;
+      }
+      
+      .modal-to-lh {
+        font-size: 14px;
+        color: #666;
+        background: white;
+        padding: 4px 12px;
+        border-radius: 15px;
+        border: 1px solid #ddd;
+      }
+      
+      .modal-to-close {
+        margin-left: auto;
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: #999;
+        padding: 0 8px;
+      }
+      
+      .modal-to-close:hover {
+        color: #333;
+      }
+      
+      .modal-to-info {
+        display: flex;
+        gap: 20px;
+        padding: 15px 20px;
+        background: #f8f9fa;
+        border-bottom: 1px solid #e0e0e0;
+      }
+      
+      .modal-to-info.segunda-linha {
+        background: #fff;
+      }
+      
+      .modal-to-info .info-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 8px 16px;
+        background: white;
+        border-radius: 8px;
+        border: 1px solid #e0e0e0;
+        min-width: 100px;
+      }
+      
+      .modal-to-info .info-item.destaque {
+        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+        border-color: #2196f3;
+      }
+      
+      .modal-to-info .info-label {
+        font-size: 11px;
+        color: #666;
+        text-transform: uppercase;
+      }
+      
+      .modal-to-info .info-valor {
+        font-size: 20px;
+        font-weight: 700;
+        color: #333;
+      }
+      
+      .modal-to-info .info-item.destaque .info-valor {
+        color: #1976d2;
+      }
+      
+      .modal-to-table-container {
+        flex: 1;
+        overflow-y: auto;
+        padding: 15px 20px;
+        max-height: 350px;
+      }
+      
+      .tabela-tos {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      
+      .tabela-tos th {
+        position: sticky;
+        top: 0;
+        background: #f8f9fa;
+        padding: 10px 12px;
+        text-align: left;
+        font-weight: 600;
+        border-bottom: 2px solid #dee2e6;
+        z-index: 1;
+      }
+      
+      .tabela-tos td {
+        padding: 10px 12px;
+        border-bottom: 1px solid #eee;
+      }
+      
+      .tabela-tos tbody tr:hover {
+        background: #f8f9fa;
+      }
+      
+      .tabela-tos tbody tr.to-selecionada {
+        background: #e8f5e9 !important;
+      }
+      
+      .tabela-tos tbody tr.to-estouraria {
+        background: #fff8e1;
+      }
+      
+      .badge-to-ok {
+        background: #d4edda;
+        color: #155724;
+        padding: 3px 8px;
+        border-radius: 10px;
+        font-size: 11px;
+        font-weight: 600;
+      }
+      
+      .badge-to-estoura {
+        background: #fff3cd;
+        color: #856404;
+        padding: 3px 8px;
+        border-radius: 10px;
+        font-size: 11px;
+        font-weight: 600;
+      }
+      
+      .badge-to-selecionada {
+        background: #c8e6c9;
+        color: #2e7d32;
+        padding: 3px 8px;
+        border-radius: 10px;
+        font-size: 11px;
+        font-weight: 600;
+      }
+      
+      .modal-to-resumo {
+        padding: 12px 20px;
+        background: #e3f2fd;
+        text-align: center;
+        font-weight: 600;
+        color: #1565c0;
+        border-top: 1px solid #bbdefb;
+      }
+      
+      .modal-to-footer {
+        display: flex;
+        gap: 10px;
+        padding: 15px 20px;
+        border-top: 1px solid #e0e0e0;
+        background: #f8f9fa;
+        border-radius: 0 0 12px 12px;
+      }
+      
+      .modal-to-footer .btn {
+        padding: 10px 18px;
+        font-weight: 600;
+      }
+      
+      /* LH com seleção parcial (TOs) */
+      .lh-parcial {
+        position: relative;
+      }
+      
+      .lh-parcial::after {
+        content: '📦';
+        position: absolute;
+        right: 5px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 12px;
+      }
+      
+      .badge-parcial {
+        background: #fff3cd;
+        color: #856404;
+        font-size: 10px;
+        padding: 2px 6px;
+        border-radius: 8px;
+        margin-left: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- SPLASH SCREEN -->
+    <div id="splashScreen" class="splash-screen">
+      <div class="splash-content">
+        <div class="splash-logo">
+          <img src="shopee-logo.png" alt="Shopee Logo" class="shopee-logo-img" />
+        </div>
+        <p class="splash-greeting" id="splashGreeting">Bom dia!</p>
+        <h1 class="splash-title">Planejamento Fluxo Integrado</h1>
+        <p class="splash-subtitle">Planejamento inteligente para operações eficientes</p>
+        <button class="splash-button" id="btnIniciar">✨ Iniciar</button>
+      </div>
+    </div>
+
+    <!-- HEADER -->
+    <div class="header">
+      <h1>🛒 Shopee - Planejamento Fluxo Integrado <span id="appVersion" style="font-size: 0.7em; color: white; font-weight: normal;"></span></h1>
+      <div class="header-buttons">
+        <!-- ⚡ INDICADOR MODO HEADLESS REMOVIDO - Só usa notificação temporária -->
+        
+        <div class="station-selector">
+          <label>📍 Station:</label>
+          <div class="station-search-container">
+            <input
+              type="text"
+              id="stationSearchInput"
+              placeholder="Buscar station..."
+              autocomplete="off"
+            />
+            <select id="stationSelect" style="display: none">
+              <option value="">-- Station atual do sistema --</option>
+            </select>
+            <div class="station-suggestions" id="stationSuggestions"></div>
+            <input type="hidden" id="stationSelecionada" value="" />
+          </div>
+        </div>
+        <button class="btn btn-config" id="btnConfigStations">
+          ⚙️ Stations
+        </button>
+        <button class="btn btn-secondary" id="btnSelectFile">
+          📁 Abrir Arquivo
+        </button>
+        <button class="btn btn-primary" id="btnDownload">
+          📥 Baixar Dados
+        </button>
+      </div>
+    </div>
+
+    <!-- TABS -->
+    <div class="tabs-container">
+      <div class="tabs">
+        <button class="tab" data-tab="lh-trips">🚚 LH Trips</button>
+        <button class="tab active" data-tab="planejamento">📋 Planejamento Hub</button>
+        <button class="tab" data-tab="backlog">📦 Tratar Backlog</button>
+        <button class="tab" data-tab="config" style="display: none;">⚙️ Configurações</button>
+      </div>
+    </div>
+
+    <!-- CONTAINER PRINCIPAL -->
+    <div class="container">
+      <!-- ====================== ABA LH TRIPS ====================== -->
+      <div class="tab-content" id="tab-lh-trips">
+        <div class="sidebar">
+          <div class="sidebar-header">
+            <h2>LH Trips</h2>
+            <p id="lhCount">0 LH Trips encontradas</p>
+          </div>
+          <div class="lh-list" id="lhList">
+            <div class="empty-state">
+              <div class="empty-state-icon">📦</div>
+              <h3>Nenhum dado carregado</h3>
+              <p>Clique em "Baixar Dados" ou "Abrir Arquivo"</p>
+            </div>
+          </div>
+        </div>
+        <div class="main-content">
+          <div class="content-header">
+            <h2 id="selectedLhTitle">LH Trip: Selecione uma LH</h2>
+            <span id="pedidosCount">0 pedidos</span>
+          </div>
+          <div class="table-container" id="tableContainer">
+            <div class="empty-state">
+              <div class="empty-state-icon">📋</div>
+              <h3>Selecione uma LH Trip</h3>
+              <p>Clique em uma LH na lista ao lado</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====================== ABA PLANEJAMENTO HUB ====================== -->
+      <div class="tab-content active" id="tab-planejamento">
+        <div class="planejamento-container">
+          <!-- Header com botão recolher -->
+          <div class="planejamento-header">
+            <div class="planejamento-title">
+              <h2>📋 Planejamento Hub</h2>
+              <p>Cruzamento de dados SPX × Planilha Google Sheets</p>
+            </div>
+            <div class="planejamento-actions">
+              <div class="atualizacao-info">
+                <div class="ultima-atualizacao">
+                  📅 Última:
+                  <strong id="ultimaAtualizacaoPlanilha">Nunca</strong>
+                </div>
+                <div class="proxima-atualizacao" id="proximaAtualizacao">
+                  ⏳ Próxima em: --:--
+                </div>
+              </div>
+              <button class="btn btn-success" id="btnAtualizarPlanilha">
+                🔄 Atualizar Planilha
+              </button>
+              <button class="btn btn-warning" id="btnGerarRelatorio" title="Gerar Relatório Final HTML">
+                📊 Gerar Relatório
+              </button>
+              <button class="btn" id="btnSincronizarLHs" title="Sincronizar LHs do SPX" style="background: linear-gradient(135deg, #FFC107 0%, #FF9800 100%); color: white; font-weight: 600;">
+                📦 Sincronizar LHs SPX
+              </button>
+              <button class="btn" id="btnValidarLHs" title="Validar LHs com SPX" style="background: linear-gradient(135deg, #9C27B0 0%, #673AB7 100%); color: white; font-weight: 600; display: none;">
+                🔍 Validar com SPX
+              </button>
+              <button class="btn btn-toggle-painel" id="btnTogglePainel" title="Recolher/Expandir painel">
+                🔼
+              </button>
+            </div>
+          </div>
+
+          <!-- Painel colapsável -->
+          <div class="painel-colapsavel" id="painelColapsavel">
+            <!-- Stats Cards - Linha 1 -->
+            <div class="stats-grid">
+              <div class="mini-stat">
+                <span class="mini-stat-value" id="statTotalLHs">0</span>
+                <span class="mini-stat-label">LHs</span>
+              </div>
+              <div class="mini-stat">
+                <span class="mini-stat-value" id="statTotalPedidos">0</span>
+                <span class="mini-stat-label">Pedidos</span>
+              </div>
+              <div class="mini-stat stat-ok">
+                <span class="mini-stat-value" id="statLHsEncontradas">0</span>
+                <span class="mini-stat-label">Encontradas</span>
+              </div>
+              <div class="mini-stat stat-erro">
+                <span class="mini-stat-value" id="statLHsNaoEncontradas">0</span>
+                <span class="mini-stat-label">Não encontradas</span>
+              </div>
+              <div class="mini-stat" id="cardNaPlanilha">
+                <span class="mini-stat-value" id="statTotalPlanilha">0</span>
+                <span class="mini-stat-label">Na Planilha</span>
+              </div>
+              <div class="mini-stat stat-sel">
+                <span class="mini-stat-value" id="statLHsSelecionadas">0</span>
+                <span class="mini-stat-label">Selecionadas</span>
+              </div>
+              <div class="mini-stat">
+                <span class="mini-stat-value" id="statBacklogPedidos">0</span>
+                <span class="mini-stat-label">📦 Backlog</span>
+              </div>
+            </div>
+
+            <!-- Ciclos Cards - Linha 2 (mesmo estilo) com seletor de data -->
+            <div class="ciclos-row">
+              <div class="data-ciclo-selector">
+                <label>📅 Data Expedição:</label>
+                <input type="date" id="dataCicloSelecionada" />
+                <button class="btn-data-hoje" id="btnDataHoje" title="Usar data de hoje">Hoje</button>
+              </div>
+              <div class="stats-grid ciclos-grid" id="containerCiclos">
+                <span class="sem-ciclos">Selecione uma station</span>
+              </div>
+            </div>
+          </div>
+
+
+          <!-- Barra de ações -->
+          <div class="planejamento-selecao-bar">
+            <div class="acoes-esquerda">
+              <button class="btn btn-success btn-sm" id="btnSugerirPlanejamento" title="Sugere automaticamente LHs + Backlog para atingir o CAP do ciclo">
+                🎯 Sugerir Planejamento
+              </button>
+              
+              <!-- CAP Manual Inline -->
+              <div class="cap-manual-inline">
+                <label class="cap-manual-label">📝 CAP Manual:</label>
+                <select id="capManualCicloInline" class="cap-manual-select">
+                  <option value="">Selecione...</option>
+                  <option value="AM">AM</option>
+                  <option value="PM1">PM1</option>
+                  <option value="PM2">PM2</option>
+                </select>
+                <div class="cap-manual-input-wrapper">
+                  <div 
+                    id="capManualValorInline" 
+                    class="cap-manual-input-fake" 
+                    contenteditable="true"
+                    tabindex="0"
+                    data-placeholder="Ex: 15000"
+                  ></div>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="aplicarCapManualInline()" title="Aplicar CAP Manual">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </button>
+                <button class="btn btn-danger btn-sm" onclick="removerCapManualInline()" title="Remover CAP Manual">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              </div>
+              
+              <!-- Busca ao lado -->
+              <div class="busca-lh-container">
+                <span class="busca-icon">🔍</span>
+                <input
+                  type="text"
+                  id="filtroPlanejamentoBusca"
+                  placeholder="Buscar LH..."
+                  class="busca-lh-input"
+                />
+              </div>
+            </div>
+            <button class="btn btn-primary" id="btnGerarPlanejamento">
+              📄 Gerar Planejamento
+            </button>
+          </div>
+
+          <!-- Tabela -->
+          <div class="planejamento-table-container">
+            <table class="planejamento-table" id="tabelaPlanejamento">
+              <thead id="theadPlanejamento">
+                <tr>
+                  <th>Tipo</th>
+                  <th>Status</th>
+                  <th>LH Trip</th>
+                  <th>Pedidos</th>
+                </tr>
+              </thead>
+              <tbody id="tbodyPlanejamento">
+                <tr>
+                  <td
+                    colspan="20"
+                    style="text-align: center; padding: 40px; color: #999"
+                  >
+                    <div style="font-size: 48px; margin-bottom: 15px">📋</div>
+                    <h3>Nenhum dado carregado</h3>
+                    <p>
+                      Baixe os dados do SPX e clique em "Atualizar Planilha"
+                    </p>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====================== ABA TRATAR BACKLOG ====================== -->
+      <div class="tab-content" id="tab-backlog">
+        <div class="backlog-container">
+          <!-- Header -->
+          <div class="backlog-header">
+            <div class="backlog-title">
+              <h2>📦 Tratar Backlog</h2>
+              <p>Pedidos sem LH Trip atribuída - Selecione para incluir no planejamento</p>
+            </div>
+            <div class="backlog-actions">
+              <span class="backlog-info" id="backlogInfo">0 pedidos sem LH</span>
+            </div>
+          </div>
+
+          <!-- Estatísticas Backlog -->
+          <div class="backlog-stats">
+            <div class="stat-card stat-backlog-total">
+              <div class="stat-icon">📦</div>
+              <div class="stat-info">
+                <span class="stat-value" id="statBacklogTotal">0</span>
+                <span class="stat-label">Pedidos sem LH</span>
+              </div>
+            </div>
+            <div class="stat-card stat-backlog-selecionados">
+              <div class="stat-icon">☑️</div>
+              <div class="stat-info">
+                <span class="stat-value" id="statBacklogSelecionados">0</span>
+                <span class="stat-label">Selecionados</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Barra de ações -->
+          <div class="backlog-selecao-bar">
+            <div class="selecao-buttons">
+              <button class="btn btn-secondary btn-sm" id="btnSelecionarTodosBacklog">
+                ☑️ Selecionar Todos
+              </button>
+              <button class="btn btn-secondary btn-sm" id="btnLimparSelecaoBacklog">
+                ☐ Limpar Seleção
+              </button>
+              <span class="selecao-info" id="backlogSelecaoInfo">0 pedidos selecionados</span>
+            </div>
+            <button class="btn btn-success" id="btnConfirmarBacklog">
+              ✅ Confirmar e Voltar ao Planejamento
+            </button>
+          </div>
+
+          <!-- Tabela de Backlog -->
+          <div class="backlog-table-container">
+            <table class="backlog-table" id="tabelaBacklog">
+              <thead id="theadBacklog">
+                <tr>
+                  <th style="width: 50px;">
+                    <input type="checkbox" id="checkTodosBacklog" title="Selecionar todos">
+                  </th>
+                  <th>Shipment ID</th>
+                  <th>CEP</th>
+                  <th>Cidade</th>
+                  <th>UF</th>
+                </tr>
+              </thead>
+              <tbody id="tbodyBacklog">
+                <tr>
+                  <td colspan="5" style="text-align: center; padding: 40px; color: #999;">
+                    <div style="font-size: 48px; margin-bottom: 15px;">📦</div>
+                    <h3>Nenhum pedido sem LH</h3>
+                    <p>Carregue os dados do SPX para ver pedidos sem LH Trip</p>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====================== ABA CONFIGURAÇÕES ======================
+      <div class="tab-content" id="tab-config">
+        <div class="config-simple-container">
+          <div class="config-simple-header">
+            <h2>⚙️ Configurações</h2>
+            <p>Configurações essenciais do sistema</p>
+            <button class="config-close-btn" id="btnFecharConfig">✕</button>
+          </div>
+
+          <div class="config-simple-body">
+            <!-- NAVEGADOR -->
+            <div class="config-simple-section">
+              <h3>🌐 Navegador</h3>
+              <div class="config-simple-option">
+                <div class="config-simple-option-info">
+                  <span class="config-simple-option-title">Modo Headless (Invisível)</span>
+                  <span class="config-simple-option-desc">Executar navegador em segundo plano sem interface visual</span>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="configHeadless" checked />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <!-- SESSÃO -->
+            <div class="config-simple-section">
+              <h3>🔐 Sessão</h3>
+              <div class="session-status" id="sessionStatus">
+                <div class="session-indicator"></div>
+                <span id="sessionStatusText">Verificando...</span>
+              </div>
+              <div class="config-simple-actions">
+                <button class="btn btn-warning" id="btnLimparSessao">
+                  🗑️ Limpar Sessão
+                </button>
+              </div>
+              <p class="config-simple-hint">💡 Limpe a sessão se tiver problemas de login</p>
+            </div>
+
+            <!-- ATALHO -->
+            <div class="config-simple-footer">
+              <p>⌨️ Pressione <kbd>Ctrl+U</kbd> para abrir/fechar estas configurações</p>
+              <p>⌨️ Pressione <kbd>Esc</kbd> para fechar</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LOADING -->
+    <div class="loading-overlay" id="loadingOverlay">
+      <div class="loading-content">
+        <div class="spinner"></div>
+        <h3 id="loadingTitle">Carregando...</h3>
+        <p id="loadingMessage">Aguarde...</p>
+        <div class="progress-container" id="progressContainer">
+          <div class="progress-bar-container">
+            <div class="progress-bar" id="progressBar"></div>
+          </div>
+          <p class="progress-text" id="progressText">Iniciando...</p>
+          <div class="progress-steps">
+            <div class="progress-step">
+              <div class="step-indicator" id="step1">1</div>
+              <span class="step-label">Login</span>
+            </div>
+            <div class="progress-step">
+              <div class="step-indicator" id="step2">2</div>
+              <span class="step-label">Station</span>
+            </div>
+            <div class="progress-step">
+              <div class="step-indicator" id="step3">3</div>
+              <span class="step-label">Export</span>
+            </div>
+            <div class="progress-step">
+              <div class="step-indicator" id="step4">4</div>
+              <span class="step-label">Download</span>
+            </div>
+            <div class="progress-step">
+              <div class="step-indicator" id="step5">5</div>
+              <span class="step-label">Processo</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL STATIONS -->
+    <div class="modal" id="modalStations">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>⚙️ Gerenciar Stations</h2>
+          <button class="modal-close" id="closeModalStations">&times;</button>
+        </div>
+        <div class="modal-body">
+          <h3 style="margin-bottom: 10px">Adicionar Nova Station</h3>
+          <div class="station-form">
+            <input
+              type="text"
+              id="inputStationNome"
+              placeholder="Nome (ex: LM Hub_GO_Goiânia)"
+              style="flex: 2"
+            />
+            <input
+              type="text"
+              id="inputStationCodigo"
+              placeholder="Código (ex: LGO-01)"
+              style="flex: 1"
+            />
+            <input
+              type="text"
+              id="inputStationUF"
+              placeholder="UF"
+              maxlength="2"
+              style="width: 60px"
+            />
+            <button class="btn btn-success" id="btnAddStation">
+              + Adicionar
+            </button>
+          </div>
+          <h3 style="margin-bottom: 10px">
+            Stations Cadastradas (<span id="totalStations">0</span>)
+          </h3>
+          <div class="stations-list" id="stationsList"></div>
+        </div>
+        <div class="modal-footer">
+          <button
+            class="btn btn-secondary"
+            id="btnFecharModalStations"
+            style="background: #666; border-color: #666"
+          >
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL SELEÇÃO DE TOs -->
+    <div class="modal-overlay-to" id="modalTOs" style="display: none;">
+      <div class="modal-to-content">
+        <div class="modal-to-header">
+          <h2>📦 Seleção de TOs (Transfer Orders)</h2>
+          <span class="modal-to-lh" id="modalToLhName">LH: -</span>
+          <button class="modal-to-close" onclick="fecharModalTOs()">&times;</button>
+        </div>
+        
+        <div class="modal-to-info">
+          <div class="info-item">
+            <span class="info-label">CAP do Ciclo</span>
+            <span class="info-valor" id="modalToCapCiclo">0</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Já Selecionado</span>
+            <span class="info-valor" id="modalToJaSelecionado">0</span>
+          </div>
+          <div class="info-item destaque">
+            <span class="info-label">Faltam</span>
+            <span class="info-valor" id="modalToFaltam">0</span>
+          </div>
+        </div>
+        
+        <div class="modal-to-info segunda-linha">
+          <div class="info-item">
+            <span class="info-label">TOs Selecionadas</span>
+            <span class="info-valor" id="modalToQtdTOs">0</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Pedidos das TOs</span>
+            <span class="info-valor" id="modalToPedidosTOs">0</span>
+          </div>
+          <div class="info-item destaque">
+            <span class="info-label">Novo Total</span>
+            <span class="info-valor" id="modalToNovoTotal">0</span>
+          </div>
+        </div>
+        
+        <div class="modal-to-table-container">
+          <table class="tabela-tos">
+            <thead id="theadTOs">
+              <tr>
+                <th style="width: 50px;">
+                  <input type="checkbox" id="checkTodasTOs" title="Selecionar todas">
+                </th>
+                <th>TO ID</th>
+                <th>Pedidos</th>
+                <th>Acumulado</th>
+                <th>Data Mais Antiga</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyTOs">
+              <!-- Preenchido via JS -->
+            </tbody>
+          </table>
+        </div>
+        
+        <div class="modal-to-resumo" id="modalToResumo">
+          Selecione as TOs para complementar o planejamento
+        </div>
+        
+        <div class="modal-to-footer">
+          <button class="btn btn-success" onclick="sugerirTOsAutomatico()">
+            🎯 Sugerir TOs (FIFO)
+          </button>
+          <button class="btn btn-warning" onclick="limparSelecaoTOs()">
+            🗑️ Limpar Seleção
+          </button>
+          <div style="flex: 1;"></div>
+          <button class="btn btn-secondary" onclick="fecharModalTOs()">
+            Cancelar
+          </button>
+          <button class="btn btn-primary" onclick="confirmarSelecaoTOs()">
+            ✅ Confirmar Seleção
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SPLASH SCREEN SCRIPT -->
+    <script>
+      // Controla a exibição da splash screen
+      window.addEventListener('DOMContentLoaded', function() {
+        const splashScreen = document.getElementById('splashScreen');
+        const splashGreeting = document.getElementById('splashGreeting');
+        const btnIniciar = document.getElementById('btnIniciar');
+        
+        // Define a saudação baseada no horário
+        const agora = new Date();
+        const hora = agora.getHours();
+        let saudacao = '';
+        let emoji = '';
+        
+        if (hora >= 5 && hora < 12) {
+          saudacao = 'Bom dia';
+          emoji = '🌅'; // 🌅
+        } else if (hora >= 12 && hora < 18) {
+          saudacao = 'Boa tarde';
+          emoji = '☀️'; // ☀️
+        } else {
+          saudacao = 'Boa noite';
+          emoji = '🌙'; // 🌙
+        }
+        
+        splashGreeting.textContent = `${emoji} ${saudacao}!`;
+        
+        // Botão Iniciar fecha a splash screen
+        btnIniciar.addEventListener('click', function() {
+          splashScreen.classList.add('fade-out');
+          
+          // Após o fade out (0.5s), remove a splash screen
+          setTimeout(function() {
+            splashScreen.style.display = 'none';
+          }, 500);
+        });
+      });
+    </script>
+
+    <script src="user-tracking.js"></script>
+    <script src="renderer.js"></script>
+
+    <!-- MODAL CAP MANUAL -->
+    <div class="modal-overlay-cap" id="modalCapManual" style="display: none;">
+      <div class="modal-cap-content">
+        <div class="modal-cap-header">
+          <h2>📝 Definir CAP Manual</h2>
+          <button class="modal-cap-close" onclick="fecharModalCapManual()">&times;</button>
+        </div>
+        
+        <div class="modal-cap-body">
+          <p class="modal-cap-descricao">
+            Defina a capacidade manual para o ciclo. Este valor será usado no lugar do CAP automático do Google Sheets.
+          </p>
+          
+          <div class="form-group">
+            <label for="capManualCiclo">Ciclo:</label>
+            <select id="capManualCiclo" class="form-control" onchange="atualizarPreviewCapManual()">
+              <option value="AM">AM - Manhã</option>
+              <option value="PM1">PM1 - Tarde 1</option>
+              <option value="PM2">PM2 - Tarde 2</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label for="capManualValor">Capacidade (pedidos):</label>
+            <input 
+              type="text" 
+              id="capManualValor" 
+              class="form-control" 
+              placeholder="Ex: 15000" 
+              oninput="atualizarPreviewCapManual()"
+              autofocus
+            />
+          </div>
+          
+          <div id="capManualPreview"></div>
+        </div>
+        
+        <div class="modal-cap-footer">
+          <button class="btn btn-danger" onclick="limparCapManual()">
+            🗑️ Remover CAP Manual
+          </button>
+          <div style="flex: 1;"></div>
+          <button class="btn btn-secondary" onclick="fecharModalCapManual()">
+            Cancelar
+          </button>
+          <button class="btn btn-success" onclick="confirmarCapManual()">
+            ✅ Confirmar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== MODAL SINCRONIZAR LHs SPX ==================== -->
+    <div id="modalSincronizarLHs" class="modal-overlay" style="display: none;">
+      <div class="modal-container" style="max-width: 600px;">
+        <div class="modal-header">
+          <h2>📦 Sincronizar LHs do SPX</h2>
+          <button class="modal-close" onclick="fecharModalSincronizarLHs()">×</button>
+        </div>
+        
+        <div class="modal-body">
+          <p style="margin-bottom: 20px; color: #666;">
+            Extrai dados de LHs diretamente das APIs do SPX para validação cruzada.
+          </p>
+          
+          <div class="config-group" style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 8px; font-weight: 600;">
+              📅 Período - Pendentes/Expedidos:
+            </label>
+            <select id="modalDiasPendentes" class="config-select" style="width: 100%; padding: 10px; border-radius: 6px; border: 2px solid #e0e0e0;">
+              <option value="7">7 dias</option>
+              <option value="15">15 dias</option>
+              <option value="30" selected>30 dias</option>
+              <option value="60">60 dias</option>
+              <option value="90">90 dias</option>
+            </select>
+            <small style="display: block; margin-top: 5px; color: #999;">
+              Período para buscar LHs pendentes e expedidos
+            </small>
+          </div>
+          
+          <div class="config-group" style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 8px; font-weight: 600;">
+              📅 Período - Finalizados:
+            </label>
+            <select id="modalDiasFinalizados" class="config-select" style="width: 100%; padding: 10px; border-radius: 6px; border: 2px solid #e0e0e0;">
+              <option value="30">30 dias</option>
+              <option value="60" selected>60 dias</option>
+              <option value="90">90 dias</option>
+              <option value="180">180 dias</option>
+            </select>
+            <small style="display: block; margin-top: 5px; color: #999;">
+              Período para buscar LHs finalizados (histórico)
+            </small>
+          </div>
+          
+          <!-- Progresso -->
+          <div id="modalSincProgresso" style="display: none; margin-top: 25px;">
+            <h4 style="margin-bottom: 10px; color: #333;">🔄 Sincronizando...</h4>
+            <div class="progress-bar" style="height: 30px; background: #e0e0e0; border-radius: 15px; overflow: hidden; margin-bottom: 10px;">
+              <div id="modalSincProgressBar" class="progress-fill" style="height: 100%; background: linear-gradient(90deg, #FFC107 0%, #FF9800 100%); width: 0%; transition: width 0.3s ease;"></div>
+            </div>
+            <p id="modalSincStatus" style="text-align: center; color: #666; font-size: 14px;">Preparando...</p>
+          </div>
+          
+          <!-- Resultado -->
+          <div id="modalSincResultado" style="display: none; margin-top: 25px;">
+            <h4 style="margin-bottom: 15px; color: #28a745;">✅ Sincronização Concluída!</h4>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 15px;">
+              <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 11px; opacity: 0.9; margin-bottom: 5px;">Pendentes</div>
+                <div id="modalStatPendentes" style="font-size: 24px; font-weight: bold;">-</div>
+              </div>
+              <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 15px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 11px; opacity: 0.9; margin-bottom: 5px;">Expedidos</div>
+                <div id="modalStatExpedidos" style="font-size: 24px; font-weight: bold;">-</div>
+              </div>
+              <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 15px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 11px; opacity: 0.9; margin-bottom: 5px;">Finalizados</div>
+                <div id="modalStatFinalizados" style="font-size: 24px; font-weight: bold;">-</div>
+              </div>
+              <div style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; padding: 15px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 11px; opacity: 0.9; margin-bottom: 5px;">Total</div>
+                <div id="modalStatTotal" style="font-size: 24px; font-weight: bold;">-</div>
+              </div>
+            </div>
+            <div id="modalSincCaminhos" style="padding: 12px; background: #f8f9fa; border-radius: 6px; font-size: 13px;"></div>
+          </div>
+        </div>
+        
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="fecharModalSincronizarLHs()" id="btnCancelarSinc">
+            Cancelar
+          </button>
+          <button class="btn btn-success" onclick="executarSincronizacaoLHs()" id="btnExecutarSinc" style="background: linear-gradient(135deg, #FFC107 0%, #FF9800 100%); border: none;">
+            🚀 Iniciar Sincronização
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== MODAL VALIDAR LHs COM SPX ==================== -->
+    <div id="modalValidarLHs" class="modal-overlay" style="display: none;">
+      <div class="modal-container" style="max-width: 800px;">
+        <div class="modal-header">
+          <h2>🔍 Validar LHs com SPX</h2>
+          <button class="modal-close" onclick="fecharModalValidarLHs()">×</button>
+        </div>
+        
+        <div class="modal-body">
+          <p style="margin-bottom: 20px; color: #666;">
+            Compara dados do Google Sheets com dados sincronizados do SPX para identificar discrepâncias.
+          </p>
+          
+          <!-- Filtro de Sequence Number -->
+          <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+            <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #333;">
+              🎯 Filtrar LHs por:
+            </label>
+            <select id="validSequenceFilter" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;">
+              <option value="todos">🔵 Todos (Origem OU Destino)</option>
+              <option value="origem">🟢 Apenas Origem (sequence_number: 1)</option>
+              <option value="destino">🟣 Apenas Destino (sequence_number: 2)</option>
+            </select>
+            <p style="margin-top: 8px; font-size: 12px; color: #666;">
+              💡 <strong>Origem:</strong> LHs onde a station atual é a origem<br>
+              💡 <strong>Destino:</strong> LHs onde a station atual é o destino
+            </p>
+          </div>
+          
+          <!-- Progresso -->
+          <div id="modalValidProgresso" style="display: none; margin-top: 25px;">
+            <h4 style="margin-bottom: 10px; color: #333;">🔄 Validando...</h4>
+            <div class="progress-bar" style="height: 30px; background: #e0e0e0; border-radius: 15px; overflow: hidden; margin-bottom: 10px;">
+              <div id="modalValidProgressBar" class="progress-fill" style="height: 100%; background: linear-gradient(90deg, #9C27B0 0%, #673AB7 100%); width: 0%; transition: width 0.3s ease;"></div>
+            </div>
+            <p id="modalValidStatus" style="text-align: center; color: #666; font-size: 14px;">Preparando...</p>
+          </div>
+          
+          <!-- Resultado -->
+          <div id="modalValidResultado" style="display: none; margin-top: 25px;">
+            <h4 style="margin-bottom: 15px; color: #28a745;">✅ Validação Concluída!</h4>
+            
+            <!-- Estatísticas -->
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px;">
+              <div style="background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%); color: white; padding: 15px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 11px; opacity: 0.9; margin-bottom: 5px;">LHs com Dados Faltantes</div>
+                <div id="modalStatFaltantes" style="font-size: 24px; font-weight: bold;">-</div>
+              </div>
+              <div style="background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%); color: white; padding: 15px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 11px; opacity: 0.9; margin-bottom: 5px;">Apenas no Sheets</div>
+                <div id="modalStatApenasSheets" style="font-size: 24px; font-weight: bold;">-</div>
+              </div>
+              <div style="background: linear-gradient(135deg, #9c27b0 0%, #7b1fa2 100%); color: white; padding: 15px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 11px; opacity: 0.9; margin-bottom: 5px;">Apenas no SPX</div>
+                <div id="modalStatApenasSPX" style="font-size: 24px; font-weight: bold;">-</div>
+              </div>
+              <div style="background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%); color: white; padding: 15px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 11px; opacity: 0.9; margin-bottom: 5px;">Total Comparado</div>
+                <div id="modalStatComparado" style="font-size: 24px; font-weight: bold;">-</div>
+              </div>
+            </div>
+            
+            <!-- Detalhes -->
+            <div id="modalValidDetalhes" style="padding: 15px; background: #f8f9fa; border-radius: 6px; font-size: 13px; max-height: 300px; overflow-y: auto;"></div>
+          </div>
+        </div>
+        
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="fecharModalValidarLHs()" id="btnCancelarValid">
+            Cancelar
+          </button>
+          <button class="btn btn-success" onclick="executarValidacaoLHs()" id="btnExecutarValid" style="background: linear-gradient(135deg, #9C27B0 0%, #673AB7 100%); border: none;">
+            🚀 Iniciar Validação
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL EASTER EGG - SOBRE O PROJETO -->
+    <div class="modal" id="modalEasterEgg" style="display: none;">
+      <div class="modal-content" style="max-width: 900px; max-height: 90vh; overflow-y: auto;">
+        <div class="modal-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+          <h2>🎉 Sobre o Projeto</h2>
+          <button class="modal-close" id="closeModalEasterEgg" style="color: white;">&times;</button>
+        </div>
+        <div class="modal-body" style="padding: 30px;">
+          
+          <!-- LOGBRAIN -->
+          <div style="text-align: center; margin-bottom: 40px; padding: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; color: white;">
+            <h1 style="font-size: 48px; margin: 0 0 10px 0; font-weight: 800; letter-spacing: 2px;">🧠 LOGBRAIN</h1>
+            <p style="font-size: 18px; margin: 0; opacity: 0.95; font-weight: 500;">Inovação em automação logística</p>
+          </div>
+
+          <!-- DESENVOLVEDORES -->
+          <div style="margin-bottom: 40px;">
+            <h3 style="font-size: 24px; margin-bottom: 20px; color: #333; border-bottom: 3px solid #667eea; padding-bottom: 10px;">👥 Desenvolvedores</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+              <!-- Édipo -->
+              <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #667eea;">
+                <h4 style="margin: 0 0 15px 0; font-size: 18px; color: #333;">Antonio Édipo de Oliveira Fernandes</h4>
+                <p style="margin: 5px 0; font-size: 14px; color: #666;">💻 Desenvolvedor Full Stack</p>
+                <hr style="margin: 15px 0; border: none; border-top: 1px solid #dee2e6;">
+                <p style="margin: 5px 0; font-size: 13px; color: #555;">📧 antonio.fernandes@shopee.com</p>
+                <p style="margin: 5px 0; font-size: 13px; color: #555;">📱 (61) 98299-9386</p>
+              </div>
+              <!-- Peter -->
+              <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #764ba2;">
+                <h4 style="margin: 0 0 15px 0; font-size: 18px; color: #333;">Peter Alvez Queiroz</h4>
+                <p style="margin: 5px 0; font-size: 14px; color: #666;">💻 Desenvolvedor Full Stack</p>
+                <hr style="margin: 15px 0; border: none; border-top: 1px solid #dee2e6;">
+                <p style="margin: 5px 0; font-size: 13px; color: #555;">📧 peter.queiroz@shopee.com</p>
+                <p style="margin: 5px 0; font-size: 13px; color: #555;">📱 (61) 98141-2790</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- HISTÓRIA -->
+          <div style="margin-bottom: 40px;">
+            <h3 style="font-size: 24px; margin-bottom: 20px; color: #333; border-bottom: 3px solid #667eea; padding-bottom: 10px;">📚 História do Projeto</h3>
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 12px; border-left: 4px solid #28a745;">
+              <p style="font-size: 14px; line-height: 1.8; color: #555; margin-bottom: 15px;">
+O <strong>Planejamento-Integrado v8.0</strong> nasceu da necessidade de otimizar o gerenciamento de <strong>Line Hauls (LHs)</strong> da Shopee/SPX. O que começou como uma ferramenta simples de planejamento evoluiu para um sistema completo de sincronização, validação e análise de dados logísticos.
+              </p>
+              <p style="font-size: 14px; line-height: 1.8; color: #555; margin-bottom: 15px;">
+<strong>Janeiro 2026</strong> marcou o início do desenvolvimento, com a versão inicial implementando sistema de planejamento de TOs. Peter trouxe sua expertise em UI/UX, criando uma interface moderna e intuitiva (mesmo "odiando front-end" 😄). Édipo liderou a arquitetura técnica, implementando integrações complexas com Google Sheets API e Playwright.
+              </p>
+              <p style="font-size: 14px; line-height: 1.8; color: #555;">
+<strong>Fevereiro 2026</strong> trouxe a fase de maturação, com a integração completa das APIs do SPX, sistema de validação cruzada de dados e otimizações de performance. Em apenas <strong>27 dias</strong>, foram realizados <strong>141 commits</strong>, resultando em um sistema robusto e confiável.
+              </p>
+            </div>
+          </div>
+
+          <!-- ESTATÍSTICAS -->
+          <div style="margin-bottom: 40px;">
+            <h3 style="font-size: 24px; margin-bottom: 20px; color: #333; border-bottom: 3px solid #667eea; padding-bottom: 10px;">📊 Estatísticas</h3>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px;">
+              <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 10px; text-align: center;">
+                <div style="font-size: 32px; font-weight: bold; margin-bottom: 5px;">141</div>
+                <div style="font-size: 12px; opacity: 0.9;">Commits</div>
+              </div>
+              <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 20px; border-radius: 10px; text-align: center;">
+                <div style="font-size: 32px; font-weight: bold; margin-bottom: 5px;">27</div>
+                <div style="font-size: 12px; opacity: 0.9;">Dias</div>
+              </div>
+              <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 20px; border-radius: 10px; text-align: center;">
+                <div style="font-size: 32px; font-weight: bold; margin-bottom: 5px;">16k</div>
+                <div style="font-size: 12px; opacity: 0.9;">Linhas de Código</div>
+              </div>
+              <div style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; padding: 20px; border-radius: 10px; text-align: center;">
+                <div style="font-size: 32px; font-weight: bold; margin-bottom: 5px;">2</div>
+                <div style="font-size: 12px; opacity: 0.9;">Desenvolvedores</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TECNOLOGIAS -->
+          <div style="margin-bottom: 40px;">
+            <h3 style="font-size: 24px; margin-bottom: 20px; color: #333; border-bottom: 3px solid #667eea; padding-bottom: 10px;">🛠️ Tecnologias</h3>
+            <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+              <span style="background: #667eea; color: white; padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600;">Electron</span>
+              <span style="background: #68a063; color: white; padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600;">Node.js</span>
+              <span style="background: #2ecc71; color: white; padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600;">Playwright</span>
+              <span style="background: #0f9d58; color: white; padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600;">Google Sheets API</span>
+              <span style="background: #e34c26; color: white; padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600;">HTML5</span>
+              <span style="background: #264de4; color: white; padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600;">CSS3</span>
+              <span style="background: #f7df1e; color: #333; padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600;">JavaScript ES6+</span>
+              <span style="background: #ee4d2d; color: white; padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600;">SPX APIs</span>
+            </div>
+          </div>
+
+          <!-- FUNCIONALIDADES -->
+          <div style="margin-bottom: 40px;">
+            <h3 style="font-size: 24px; margin-bottom: 20px; color: #333; border-bottom: 3px solid #667eea; padding-bottom: 10px;">⭐ Funcionalidades Principais</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+              <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #28a745;">
+                <h4 style="margin: 0 0 8px 0; font-size: 15px; color: #333;">📋 Planejamento Hub</h4>
+                <p style="margin: 0; font-size: 13px; color: #666; line-height: 1.6;">Integração com Google Sheets, visualização por ciclo, filtros avançados</p>
+              </div>
+              <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #007bff;">
+                <h4 style="margin: 0 0 8px 0; font-size: 15px; color: #333;">🚚 LH Trips</h4>
+                <p style="margin: 0; font-size: 13px; color: #666; line-height: 1.6;">Visualização de Line Hauls, estatísticas em tempo real</p>
+              </div>
+              <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #fd7e14;">
+                <h4 style="margin: 0 0 8px 0; font-size: 15px; color: #333;">📦 Tratar Backlog</h4>
+                <p style="margin: 0; font-size: 13px; color: #666; line-height: 1.6;">Identificação automática de pedidos em backlog</p>
+              </div>
+              <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #6f42c1;">
+                <h4 style="margin: 0 0 8px 0; font-size: 15px; color: #333;">🔄 Sincronização SPX</h4>
+                <p style="margin: 0; font-size: 13px; color: #666; line-height: 1.6;">Exportação de LHs direto das APIs com progresso</p>
+              </div>
+              <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #9c27b0;">
+                <h4 style="margin: 0 0 8px 0; font-size: 15px; color: #333;">✅ Validação Cruzada</h4>
+                <p style="margin: 0; font-size: 13px; color: #666; line-height: 1.6;">Comparação Google Sheets vs SPX</p>
+              </div>
+              <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #667eea;">
+                <h4 style="margin: 0 0 8px 0; font-size: 15px; color: #333;">⚙️ Configurações</h4>
+                <p style="margin: 0; font-size: 13px; color: #666; line-height: 1.6;">Modo Headless, gerenciamento de sessão</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- CONQUISTAS -->
+          <div style="margin-bottom: 40px;">
+            <h3 style="font-size: 24px; margin-bottom: 20px; color: #333; border-bottom: 3px solid #667eea; padding-bottom: 10px;">🏆 Conquistas</h3>
+            <div style="background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%); padding: 20px; border-radius: 12px;">
+              <ul style="margin: 0; padding-left: 20px; font-size: 14px; line-height: 2; color: #333;">
+                <li><strong>141 commits</strong> em 27 dias (média de 5.2 commits/dia)</li>
+                <li><strong>16.188 linhas de código</strong> escritas</li>
+                <li><strong>Integração completa</strong> com Google Sheets API e SPX</li>
+                <li><strong>Interface moderna</strong> inspirada na Shopee</li>
+                <li><strong>Sistema de build</strong> com electron-builder</li>
+                <li><strong>Easter Egg secreto</strong> descoberto! 🎉</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- AGRADECIMENTOS -->
+          <div style="margin-bottom: 40px;">
+            <h3 style="font-size: 24px; margin-bottom: 20px; color: #333; border-bottom: 3px solid #667eea; padding-bottom: 10px;">🙏 Agradecimentos</h3>
+            <div style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #2196f3;">
+              <p style="font-size: 14px; line-height: 1.8; color: #333; margin-bottom: 15px;">
+Esta ferramenta foi desenvolvida em <strong>colaboração com o time de Backoffice da Shopee/SPX</strong>, que contribuiu com feedbacks valiosos, testes e validações durante todo o processo de desenvolvimento.
+              </p>
+              <p style="font-size: 14px; line-height: 1.8; color: #333; margin: 0;">
+Agradecimento especial a <strong>Paulo Fernandes</strong> pela participação colaborativa, sugestões e apoio durante o desenvolvimento do projeto.
+              </p>
+            </div>
+          </div>
+
+          <!-- RODAPÉ -->
+          <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; color: white;">
+            <p style="font-size: 18px; margin: 0 0 10px 0; font-weight: 600;">Desenvolvido com ❤️ pela LOGBRAIN</p>
+            <p style="font-size: 14px; margin: 0 0 15px 0; opacity: 0.9;">Planejamento-Integrado v8.0</p>
+            <p style="font-size: 16px; margin: 0; font-style: italic; opacity: 0.95;">🚀 "Automatizando o futuro da logística" 🚀</p>
+            <hr style="margin: 20px 0; border: none; border-top: 1px solid rgba(255,255,255,0.3);">
+            <p style="font-size: 12px; margin: 0; opacity: 0.8;">⌨️ Atalho secreto: Ctrl + /</p>
+          </div>
+
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="fecharModalEasterEgg()" style="background: #667eea; border-color: #667eea;">
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL LOGIN (E-MAIL DO USUÁRIO) -->
+    <div class="modal-overlay" id="modalLogin" style="display: none; z-index: 9999;">
+      <div class="modal-container" style="max-width: 500px;">
+        <div class="modal-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+          <h2 style="color: white;">
+            <span style="color: white;">👤</span> 
+            <span style="color: white;">Bem-vindo ao Planejamento Integrado</span>
+          </h2>
+        </div>
+        
+        <div class="modal-body" style="padding: 30px;">
+          <p style="margin-bottom: 20px; color: #666; text-align: center;">
+            Para começar a usar a ferramenta, por favor informe seu e-mail corporativo.
+          </p>
+          
+          <div style="margin-bottom: 20px;">
+            <label for="inputEmailUsuario" style="display: block; margin-bottom: 8px; font-weight: 600; color: #333;">
+              E-mail:
+            </label>
+            <input 
+              type="email" 
+              id="inputEmailUsuario" 
+              placeholder="seu.email@shopee.com" 
+              style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 6px; font-size: 14px;"
+              required
+            />
+          </div>
+          
+          <p style="font-size: 12px; color: #999; text-align: center;">
+            🔒 Seu e-mail será usado apenas para registro de uso da ferramenta.
+          </p>
+        </div>
+        
+        <div class="modal-footer">
+          <button class="btn btn-primary" onclick="confirmarEmailUsuario()" style="width: 100%; padding: 12px; font-size: 16px;">
+            ✅ Confirmar e Iniciar
+          </button>
+        </div>
+      </div>
+    </div>
+<!-- ============================================
+     MODAIS DO SISTEMA DE LICENCIAMENTO
+     Adicionar no final do index.html, antes do </body>
+     ============================================ -->
+
+<!-- Modal: Licença Expirada -->
+<div id="licenseExpiredModal" class="license-modal">
+  <div class="license-modal-content">
+    <div class="license-header">
+      <div class="icon">🔒</div>
+      <h1>LICENÇA EXPIRADA</h1>
+    </div>
+    
+    <div class="license-body">
+      <div class="license-info">
+        <p><strong>Este software expirou em:</strong></p>
+        <p id="licenseExpiredDate" style="font-size: 18px; color: #f44336; font-weight: bold;">--/--/----</p>
+      </div>
+      
+      <p style="text-align: center; margin: 24px 0; font-size: 15px; color: #666;">
+        Para continuar usando, solicite uma renovação ou digite uma senha de ativação.
+      </p>
+      
+      <!-- Divider -->
+      <div class="license-divider">
+        <span>SOLICITAR RENOVAÇÃO</span>
+      </div>
+      
+      <div class="license-form">
+        <div class="license-form-group" id="licenseNameGroup">
+          <label for="licenseName">👤 Nome completo:</label>
+          <input 
+            type="text" 
+            id="licenseName" 
+            placeholder="Digite seu nome completo"
+            autocomplete="off"
+          />
+          <div class="error-text">Nome muito curto (mínimo 3 caracteres)</div>
+        </div>
+        
+        <div class="license-form-group" id="licenseEmailGroup">
+          <label for="licenseEmail">📧 Email Shopee:</label>
+          <input 
+            type="email" 
+            id="licenseEmail" 
+            placeholder="seu.nome@shopee.com"
+            autocomplete="off"
+          />
+          <div class="helper-text">Deve terminar com @shopee.com</div>
+          <div class="error-text">Email deve ser @shopee.com</div>
+        </div>
+        
+        <div class="license-buttons">
+          <button class="license-btn license-btn-primary" id="btnRequestRenewal">
+            Solicitar Renovação
+          </button>
+        </div>
+      </div>
+      
+      <!-- Divider -->
+      <div class="license-divider">
+        <span>JÁ TENHO SENHA</span>
+      </div>
+      
+      <div class="license-form">
+        <div class="license-form-group" id="licensePasswordGroup">
+          <label for="licensePassword">🔑 Senha de ativação:</label>
+          <input 
+            type="text" 
+            id="licensePassword" 
+            placeholder="SHOP-2026-XXXX-XXXX-XXXX"
+            autocomplete="off"
+            style="font-family: 'Courier New', monospace; text-transform: uppercase;"
+          />
+          <div class="error-text">Senha inválida</div>
+        </div>
+        
+        <div class="license-buttons">
+          <button class="license-btn license-btn-success" id="btnActivateLicense">
+            Ativar Licença
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Solicitação Enviada -->
+<div id="licenseRequestSentModal" class="license-modal">
+  <div class="license-modal-content">
+    <div class="license-header success">
+      <div class="icon">✅</div>
+      <h1>SOLICITAÇÃO ENVIADA</h1>
+    </div>
+    
+    <div class="license-body">
+      <div class="license-message-box success">
+        <p><strong>Sua solicitação foi criada com sucesso!</strong></p>
+        <p>Copie a mensagem abaixo e envie para os administradores.</p>
+      </div>
+      
+      <div class="license-code-box">
+        <div class="label">Código de Solicitação</div>
+        <div class="code" id="requestCodeDisplay">REQ-2026-XX-XX-XXXXXX</div>
+      </div>
+      
+      <div class="license-form-group">
+        <label>📧 Enviar para (copie a mensagem abaixo):</label>
+        <div style="background: #f5f5f5; padding: 12px; border-radius: 8px; margin-bottom: 12px;">
+          <p style="margin: 0; font-size: 14px; color: #666;">
+            <strong>ediiiiipo@gmail.com</strong><br>
+            <strong>petternds@gmail.com</strong>
+          </p>
+        </div>
+      </div>
+      
+      <div class="license-form-group" style="position: relative;">
+        <label>📋 Mensagem (copie e envie via email, WhatsApp, etc):</label>
+        <textarea 
+          id="requestEmailMessage" 
+          class="license-textarea" 
+          readonly
+        ></textarea>
+        <button class="license-copy-btn" id="btnCopyRequestMessage">
+          Copiar
+        </button>
+      </div>
+      
+      <div class="license-message-box">
+        <p><strong>⏳ Aguarde aprovação</strong></p>
+        <p>Após aprovação, você receberá a senha de ativação no email informado.</p>
+      </div>
+      
+      <div class="license-buttons">
+        <button class="license-btn license-btn-primary" id="btnCloseRequestSent">
+          Entendido
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Licença Ativada -->
+<div id="licenseActivatedModal" class="license-modal">
+  <div class="license-modal-content">
+    <div class="license-header success">
+      <div class="icon">🎉</div>
+      <h1>LICENÇA ATIVADA</h1>
+    </div>
+    
+    <div class="license-body">
+      <div class="license-message-box success">
+        <p><strong>Parabéns! Sua licença foi ativada com sucesso!</strong></p>
+      </div>
+      
+      <div class="license-info">
+        <p><strong>⏰ Válida até:</strong></p>
+        <p id="licenseActivatedDate" style="font-size: 18px; color: #4caf50; font-weight: bold;">
+          --/--/----
+        </p>
+        <p style="margin-top: 12px; color: #666;">
+          Você pode usar o software normalmente pelos próximos <strong>6 meses</strong>.
+        </p>
+      </div>
+      
+      <div class="license-buttons">
+        <button class="license-btn license-btn-success" id="btnCloseActivated">
+          Começar a Usar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Aviso de Expiração -->
+<div id="licenseWarningModal" class="license-modal">
+  <div class="license-modal-content">
+    <div class="license-header warning">
+      <div class="icon">⚠️</div>
+      <h1>ATENÇÃO: LICENÇA PRÓXIMA DO VENCIMENTO</h1>
+    </div>
+    
+    <div class="license-body">
+      <div class="license-message-box">
+        <p><strong>Sua licença está próxima de expirar!</strong></p>
+      </div>
+      
+      <div class="license-info">
+        <p><strong>⏰ Expira em:</strong></p>
+        <p id="licenseWarningDate" style="font-size: 18px; color: #ff9800; font-weight: bold;">
+          --/--/----
+        </p>
+        <p id="licenseWarningDays" style="margin-top: 12px; color: #666;">
+          Faltam <strong>X dias</strong>
+        </p>
+      </div>
+      
+      <p style="text-align: center; margin: 24px 0; font-size: 15px; color: #666;">
+        Renove agora para evitar interrupções no uso do software.
+      </p>
+      
+      <div class="license-buttons">
+        <button class="license-btn license-btn-primary" id="btnRenewFromWarning">
+          Renovar Agora
+        </button>
+        <button class="license-btn license-btn-secondary" id="btnCloseWarning">
+          Lembrar Depois
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Painel Admin (CTRL + *) -->
+<div id="licenseAdminPanel" class="license-admin-panel">
+  <div class="license-admin-content">
+    <div class="license-admin-header">
+      <h1>⚙️ PAINEL DE LICENCIAMENTO</h1>
+      <button class="license-close-btn" id="btnCloseAdminPanel" style="position: absolute; top: 20px; right: 20px;">
+        ✕
+      </button>
+    </div>
+    
+    <div class="license-admin-body">
+      <!-- Status da Licença -->
+      <div class="license-admin-section">
+        <h2>📊 STATUS DA LICENÇA</h2>
+        <div id="adminLicenseStatus" class="license-status active">
+          <div class="license-status-icon">✅</div>
+          <div class="license-status-info">
+            <h3>Licença Ativa</h3>
+            <p>Expira em: <strong id="adminExpiryDate">--/--/----</strong></p>
+            <p>Dias restantes: <strong id="adminDaysRemaining">---</strong></p>
+          </div>
+        </div>
+        
+        <div class="license-buttons">
+          <button class="license-btn license-btn-primary" id="btnExtendLicense">
+            Estender +6 Meses
+          </button>
+        </div>
+      </div>
+      
+      <!-- Aprovar Solicitação -->
+      <div class="license-admin-section">
+        <h2>✅ APROVAR SOLICITAÇÃO</h2>
+        
+        <div class="license-form-group">
+          <label for="adminRequestCode">Cole o código de solicitação:</label>
+          <input 
+            type="text" 
+            id="adminRequestCode" 
+            placeholder="REQ-2026-XX-XX-XXXXXX"
+            style="font-family: 'Courier New', monospace; text-transform: uppercase;"
+          />
+        </div>
+        
+        <div class="license-buttons">
+          <button class="license-btn license-btn-primary" id="btnSearchRequest">
+            Buscar Solicitação
+          </button>
+        </div>
+        
+        <!-- Informações da Solicitação -->
+        <div id="adminRequestInfo" style="display: none; margin-top: 20px;">
+          <div class="license-info">
+            <p><strong>📋 Solicitante:</strong></p>
+            <p>Nome: <span id="adminReqName">---</span></p>
+            <p>Email: <span id="adminReqEmail">---</span></p>
+            <p>PC: <span id="adminReqComputer">---</span></p>
+            <p>Data: <span id="adminReqDate">---</span></p>
+          </div>
+          
+          <div class="license-buttons">
+            <button class="license-btn license-btn-success" id="btnApproveRequest">
+              ✅ Aprovar e Gerar Senha
+            </button>
+            <button class="license-btn license-btn-secondary" id="btnCancelApprove">
+              Cancelar
+            </button>
+          </div>
+        </div>
+        
+        <!-- Senha Gerada -->
+        <div id="adminApprovedInfo" style="display: none; margin-top: 20px;">
+          <div class="license-message-box success">
+            <p><strong>✅ Solicitação aprovada com sucesso!</strong></p>
+          </div>
+          
+          <div class="license-code-box">
+            <div class="label">Senha Gerada</div>
+            <div class="code" id="adminGeneratedPassword">SHOP-2026-XXXX-XXXX-XXXX</div>
+          </div>
+          
+          <div class="license-form-group" style="position: relative;">
+            <label>📧 Enviar para: <span id="adminApprovedEmail">---</span></label>
+            <textarea 
+              id="adminApprovalMessage" 
+              class="license-textarea" 
+              readonly
+            ></textarea>
+            <button class="license-copy-btn" id="btnCopyApprovalMessage">
+              Copiar
+            </button>
+          </div>
+          
+          <div class="license-message-box">
+            <p>Copie a mensagem acima e envie para o solicitante via email, WhatsApp, etc.</p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Histórico -->
+      <div class="license-admin-section">
+        <h2>📜 HISTÓRICO DE APROVAÇÕES</h2>
+        <ul id="adminHistoryList" class="license-history-list">
+          <li style="text-align: center; padding: 20px; color: #999;">
+            Nenhum histórico disponível
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- <link rel="stylesheet" href="license-styles.css"> -->
+  </body>
+</html>

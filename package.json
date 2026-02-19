@@ -1,0 +1,83 @@
+{
+  "name": "shopee-manager",
+  "version": "1.1.0",
+  "description": "Gerenciador de Pedidos Shopee - Planejamento Integrado (Ultra-Otimizado)",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "set NODE_ENV=development && electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win --x64",
+    "build:portable": "electron-builder --win portable --x64"
+  },
+  "keywords": [
+    "shopee",
+    "automation",
+    "electron"
+  ],
+  "author": "Shopee Team",
+  "license": "MIT",
+  "dependencies": {
+    "adm-zip": "^0.5.10",
+    "fs-extra": "^11.2.0",
+    "googleapis": "^169.0.0",
+    "playwright-core": "^1.40.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.57.0",
+    "electron": "^28.3.3",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.shopee.planejamento-integrado",
+    "productName": "Shopee - Planejamento Integrado",
+    "copyright": "Copyright © 2026 Shopee",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!**/*.map",
+      "!**/*.md",
+      "!**/LICENSE",
+      "!**/README.md"
+    ],
+
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "requestedExecutionLevel": "asInvoker",
+      "sign": null,
+      "verifyUpdateCodeSignature": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Shopee - Planejamento Integrado",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "deleteAppDataOnUninstall": false
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-Portable.${ext}"
+    }
+  }
+}
