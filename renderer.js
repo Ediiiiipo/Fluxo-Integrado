@@ -609,6 +609,12 @@ async function carregarArquivo(filePath) {
             
             processarDados();
             console.log(`✅ ${dadosAtuais.length} registros carregados`);
+            
+            // 🔄 SINCRONIZAÇÃO AUTOMÁTICA após download
+            console.log('🔄 Sincronizando planilhas automaticamente...');
+            setTimeout(() => {
+                atualizarPlanilhaGoogle();
+            }, 1000); // Aguarda 1 segundo para garantir que dados foram processados
         } else {
             alert(`❌ Erro ao carregar: ${resultado.error}`);
         }
