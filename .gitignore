@@ -1,0 +1,96 @@
+# Dependências
+node_modules/
+
+# Arquivos de build
+dist/
+build/
+out/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Arquivos do sistema operacional
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Sessões e dados sensíveis do navegador
+shopee_session.json
+*.session
+.session/
+
+# Dados de usuário e downloads
+user-data/
+downloads/
+*.xlsx
+*.xls
+*.csv
+*.zip
+
+# Arquivos de configuração local e credenciais
+.env
+.env.local
+.env.*.local
+credentials.json
+token.json
+client_secret*.json
+*.pem
+*.key
+*.p12
+
+# Diretório de licenças (contém dados sensíveis)
+.shopee-license/
+
+# Arquivos temporários
+*.tmp
+*.temp
+.cache/
+.temp/
+
+# IDEs e editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+.classpath
+
+# Electron
+.webpack/
+.parcel-cache/
+
+# Package managers
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# TypeScript
+*.tsbuildinfo
+
+# Testes
+coverage/
+.nyc_output/
+
+# Diversos
+*.bak
+*.orig
+*.rej
+*~
+.sass-cache/
+connect.lock
+typings/
+
+# Credenciais Google (português)
+credenciais.json
+credenciais.example.json
