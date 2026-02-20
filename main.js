@@ -1194,3 +1194,236 @@ ipcMain.handle('get-headless-mode', async () => {
     headless: globalHeadlessMode
   };
 });
+
+// ============================================
+// SINCRONIZAÇÃO SPX - BUSCAR LHS E GERAR CSV
+// ============================================
+const { chromium } = require('playwright-core');
+const { trocarStationCompleto, buscarStationIdPorNome } = require('./station-switcher-api');
+
+const SPX_CONFIG = {
+    SESSION_FILE: path.join(process.env.APPDATA || os.homedir(), 'shopee-manager', 'shopee_session.json'),
+    FILE_SPECIFIC_JSON: path.join(__dirname, 'LH_busca_especifica.json'),
+    FILE_FINAL_CSV: path.join(__dirname, 'Relatorio_LHs_Pronto.csv'),
+    API_SEARCH: "https://spx.shopee.com.br/api/admin/transportation/trip/list",
+    API_HISTORY: "https://spx.shopee.com.br/api/admin/transportation/trip/history/list"
+};
+
+// Mapeamento de Status
+const statusMap = { 
+    10: "Criado", 
+    20: "Aguardando Motorista", 
+    30: "Embarcando", 
+    40: "Em Trânsito", 
+    50: "Chegou no Destino", 
+    60: "Desembarcando", 
+    80: "Finalizado", 
+    90: "Finalizado", 
+    100: "Cancelado",
+    200: "Cancelado"
+};
+
+// Formatar Timestamps Unix para Data/Hora BR
+const formatData = (ts) => {
+    if (!ts || ts === 0) return null;
+    return new Date(ts * 1000).toLocaleString('pt-BR');
+};
+
+async function detectSystemBrowser() {
+    const paths = [
+        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+        'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
+    ];
+    for (const p of paths) { 
+        if (await fs.pathExists(p)) return p; 
+    }
+    return null;
+}
+
+/**
+ * Converte dados JSON para CSV
+ */
+async function exportToCSV(dataArray, outputFolder) {
+    console.log(`📊 Formatando ${dataArray.length} registro(s) para Excel...`);
+    
+    const rows = dataArray.map(item => {
+        const d = item.dados || item;
+        const stations = d.trip_station || [];
+        
+        const origem = stations[0] || {};
+        const destino = stations[stations.length - 1] || {};
+
+        // Lógica Smart: Se Real (atd/ata) for 0, usa Estimada (etd/eta)
+        const saida = formatData(origem.atd) || (origem.etd ? `Est: ${formatData(origem.etd)}` : "Pendente");
+        const chegada = formatData(destino.ata) || (destino.eta ? `Est: ${formatData(destino.eta)}` : "Em trânsito");
+        const planejado = formatData(d.trip_date) || "N/A";
+        const custo = (d.total_cost && d.total_cost !== 0) ? d.total_cost : (d.agency_cost || "0");
+
+        return [
+            d.trip_number,
+            statusMap[d.trip_status] || d.trip_status,
+            planejado,
+            d.driver_name || "N/A",
+            d.vehicle_number || "N/A",
+            d.vehicle_type_name || "N/A",
+            origem.station_name || "N/A",
+            saida,
+            destino.station_name || "N/A",
+            chegada,
+            custo
+        ].join(';');
+    });
+
+    const header = "LH;Status;Data Planejada;Motorista;Placa;Tipo Veiculo;Origem;Saida Real;Destino;Chegada Real;Custo";
+    const csvContent = "\ufeff" + [header, ...rows].join('\n');
+    
+    // Salvar na pasta da station com nome simples
+    const csvPath = path.join(outputFolder, 'LHs_SPX.csv');
+    await fs.writeFile(csvPath, csvContent, 'utf8');
+    console.log(`✨ Relatório gerado: ${csvPath}`);
+    
+    return csvPath;
+}
+
+/**
+ * Busca múltiplas LHs no SPX (modo Admin) e gera CSV
+ */
+async function buscarLHsNoSPXComCSV(lhIds, stationFolder, currentStationName) {
+    console.log(`\n🚀 INICIANDO BUSCA DE ${lhIds.length} LHs (MODO ADMIN)...`);
+    
+    if (!await fs.pathExists(SPX_CONFIG.SESSION_FILE)) {
+        throw new Error("❌ Sessão SPX não encontrada. Faça login manual primeiro.");
+    }
+
+    const browserPath = await detectSystemBrowser();
+    if (!browserPath) {
+        throw new Error("❌ Navegador não encontrado.");
+    }
+
+    const browser = await chromium.launch({ 
+        executablePath: browserPath, 
+        headless: globalHeadlessMode 
+    });
+    const context = await browser.newContext({ storageState: SPX_CONFIG.SESSION_FILE });
+    const page = await context.newPage();
+    
+    let resultadosGerais = [];
+    let encontradas = 0;
+    let stationOriginal = currentStationName;
+
+    try {
+        // Navegar para SPX
+        await page.goto('https://spx.shopee.com.br/#/hubLinehaulTrips/trip', { 
+            waitUntil: 'networkidle',
+            timeout: 30000 
+        });
+        await page.waitForTimeout(3000);
+
+        // 1. TROCAR PARA STATION ADMIN
+        console.log('\n🔄 Trocando para station admin...');
+        const trocouAdmin = await trocarStationCompleto(page, 'admin');
+        
+        if (!trocouAdmin) {
+            console.warn('⚠️ Não foi possível trocar para admin, continuando na station atual...');
+        } else {
+            console.log('✅ Agora operando na station admin');
+        }
+        
+        await page.waitForTimeout(2000);
+
+        // 2. BUSCAR LHs
+        for (const lhId of lhIds) {
+            console.log(`   🔡 Buscando ${lhId}...`);
+            let achou = false;
+
+            try {
+                // Tenta nas duas APIs
+                for (const api of [SPX_CONFIG.API_SEARCH, SPX_CONFIG.API_HISTORY]) {
+                    const res = await page.evaluate(async ({url, id}) => {
+                        try {
+                            const r = await fetch(`${url}?trip_number=${id}&pageno=1&count=10`);
+                            return r.ok ? await r.json() : null;
+                        } catch (e) { return null; }
+                    }, { url: api, id: lhId });
+
+                    if (res?.data?.list?.length > 0) {
+                        const match = res.data.list.find(i => i.trip_number.trim() === lhId.trim()) || res.data.list[0];
+                        resultadosGerais.push({ lh_id: lhId, dados: match });
+                        encontradas++;
+                        console.log(`      ✅ ${lhId} encontrada!`);
+                        achou = true;
+                        break;
+                    }
+                }
+            } catch (err) {
+                console.error(`      ⚠️ Erro: ${err.message}`);
+            }
+
+            if (!achou) {
+                console.log(`      ❌ ${lhId} não encontrada`);
+            }
+            
+            await page.waitForTimeout(800);
+        }
+        
+        // 3. VOLTAR PARA STATION ORIGINAL
+        if (stationOriginal && stationOriginal !== 'admin') {
+            console.log(`\n🔄 Voltando para station original: ${stationOriginal}`);
+            const voltou = await trocarStationCompleto(page, stationOriginal);
+            
+            if (voltou) {
+                console.log(`✅ Restaurado para: ${stationOriginal}`);
+            } else {
+                console.warn(`⚠️ Não foi possível voltar para ${stationOriginal}`);
+            }
+        }
+        
+    } finally {
+        await browser.close();
+    }
+
+    console.log(`\n✅ BUSCA CONCLUÍDA: ${encontradas}/${lhIds.length}`);
+
+    let csvPath = null;
+    
+    if (resultadosGerais.length > 0) {
+        // Salvar JSON
+        await fs.writeJson(SPX_CONFIG.FILE_SPECIFIC_JSON, resultadosGerais, { spaces: 2 });
+        
+        // Gerar CSV na pasta da station
+        csvPath = await exportToCSV(resultadosGerais, stationFolder);
+    }
+
+    return {
+        total: lhIds.length,
+        encontradas: encontradas,
+        erros: lhIds.length - encontradas,
+        resultados: resultadosGerais,
+        csvPath: csvPath,
+        jsonPath: resultadosGerais.length > 0 ? SPX_CONFIG.FILE_SPECIFIC_JSON : null
+    };
+}
+
+ipcMain.handle('sincronizar-lhs-spx', async (event, { lhIds, stationFolder, currentStationName }) => {
+    try {
+        console.log('\n🔄 INICIANDO SINCRONIZAÇÃO SPX...');
+        console.log(`📍 Station atual: ${currentStationName}`);
+        const resultado = await buscarLHsNoSPXComCSV(lhIds, stationFolder, currentStationName);
+        return { success: true, data: resultado };
+    } catch (error) {
+        console.error('❌ Erro na sincronização SPX:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// Handler: Abrir arquivo no sistema
+ipcMain.handle('abrir-arquivo', async (event, filePath) => {
+    try {
+        const { shell } = require('electron');
+        await shell.openPath(filePath);
+        return { success: true };
+    } catch (error) {
+        console.error('❌ Erro ao abrir arquivo:', error);
+        return { success: false, error: error.message };
+    }
+});

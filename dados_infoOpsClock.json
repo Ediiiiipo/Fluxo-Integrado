@@ -1,5 +1,5 @@
 {
-  "ultimaAtualizacao": "2026-02-19T17:21:17.489Z",
+  "ultimaAtualizacao": "2026-02-20T01:04:09.685Z",
   "totalRegistros": 1048,
   "dados": [
     {
@@ -808,7 +808,7 @@
       "Dispatching\n(XPT)": "0",
       "Auxiliar": "10.560",
       "Start time": "6:30:00",
-      "End time": "7:45:00",
+      "End time": "7:30:00",
       "Start time2": "10:00:00",
       "End time2": "11:00:00"
     },
@@ -3480,7 +3480,7 @@
       "Dispatching\n(LM Fleet)": "25.650",
       "Dispatching\n(XPT)": "0",
       "Auxiliar": "25.650",
-      "Start time": "23:00:00",
+      "Start time": "0:00:00",
       "End time": "1:00:00",
       "Start time2": "2:00:00",
       "End time2": "4:00:00"
@@ -3507,8 +3507,8 @@
       "Dispatching\n(LM Fleet)": "15.990",
       "Dispatching\n(XPT)": "0",
       "Auxiliar": "15.990",
-      "Start time": "3:00:00",
-      "End time": "4:00:00",
+      "Start time": "4:00:00",
+      "End time": "5:00:00",
       "Start time2": "10:00:00",
       "End time2": "11:00:00"
     },
@@ -5424,8 +5424,8 @@
       "Dispatching\n(LM Fleet)": "30.240",
       "Dispatching\n(XPT)": "0",
       "Auxiliar": "23.040",
-      "Start time": "1:00:00",
-      "End time": "3:00:00",
+      "Start time": "0:00:00",
+      "End time": "1:00:00",
       "Start time2": "4:00:00",
       "End time2": "6:00:00"
     },
@@ -5857,7 +5857,7 @@
       "Dispatching\n(XPT)": "0",
       "Auxiliar": "40.000",
       "Start time": "21:00:00",
-      "End time": "22:00:00",
+      "End time": "23:00:00",
       "Start time2": "0:00:00",
       "End time2": "4:00:00"
     },
@@ -15927,8 +15927,8 @@
       "Dispatching\n(LM Fleet)": "8.800",
       "Dispatching\n(XPT)": "0",
       "Auxiliar": "8.800",
-      "Start time": "7:00:00",
-      "End time": "8:00:00",
+      "Start time": "8:00:00",
+      "End time": "9:00:00",
       "Start time2": "9:00:00",
       "End time2": "10:00:00"
     },
@@ -16791,8 +16791,8 @@
       "Dispatching\n(LM Fleet)": "38.016",
       "Dispatching\n(XPT)": "0",
       "Auxiliar": "27.500",
-      "Start time": "8:00:00",
-      "End time": "9:00:00",
+      "Start time": "7:30:00",
+      "End time": "8:30:00",
       "Start time2": "9:00:00",
       "End time2": "10:00:00"
     },
@@ -25756,7 +25756,7 @@
       "Dispatching\n(XPT)": "0",
       "Auxiliar": "11.944",
       "Start time": "7:30:00",
-      "End time": "8:30:00",
+      "End time": "8:00:00",
       "Start time2": "9:00:00",
       "End time2": "10:30:00"
     },
@@ -26728,7 +26728,7 @@
       "Dispatching\n(XPT)": "0",
       "Auxiliar": "18.000",
       "Start time": "6:00:00",
-      "End time": "7:00:00",
+      "End time": "6:30:00",
       "Start time2": "8:30:00",
       "End time2": "10:15:00"
     },
@@ -27159,8 +27159,8 @@
       "Dispatching\n(LM Fleet)": "30.240",
       "Dispatching\n(XPT)": "0",
       "Auxiliar": "28.800",
-      "Start time": "7:00:00",
-      "End time": "7:30:00",
+      "Start time": "5:00:00",
+      "End time": "6:00:00",
       "Start time2": "7:30:00",
       "End time2": "8:30:00"
     },
@@ -27592,7 +27592,7 @@
       "Dispatching\n(XPT)": "9.000",
       "Auxiliar": "21.100",
       "Start time": "6:30:00",
-      "End time": "7:00:00",
+      "End time": "7:30:00",
       "Start time2": "7:00:00",
       "End time2": "11:45:00"
     },

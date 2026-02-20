@@ -33,7 +33,14 @@ let lhTripsPlanejáveis = {}; // LH Trips planejáveis (agrupado)
 let lhsLixoSistemico = []; // LHs filtradas automaticamente (sem origin/destination/previsão)
 
 // Status que identificam Backlog (lowercase, sem espaços)
-const STATUS_BACKLOG = ['lmhub_received', 'return_lmhub_received', 'hub_received', 'return_hub_received'];
+const STATUS_BACKLOG = [
+    'lmhub_received', 
+    'return_lmhub_received', 
+    'hub_received', 
+    'return_hub_received',
+    'sinalizar_inventário',  // 🆕 Adicionado para mover para backlog
+    'sinalizar_inventario'    // 🆕 Versão sem acento
+];
 
 // Função para verificar se status é de backlog
 function isStatusBacklog(status) {
@@ -43,6 +50,123 @@ function isStatusBacklog(status) {
     
     // Verificar se contém algum dos status de backlog
     return STATUS_BACKLOG.some(sb => statusNorm.includes(sb) || sb.includes(statusNorm));
+}
+
+/**
+ * 🆕 Reclassifica pedidos com "Sinalizar Inventário" para Backlog
+ * Esta função roda APÓS o carregamento inicial, quando os status já foram calculados
+ */
+function reclassificarSinalizarInventarioParaBacklog() {
+    console.log('\n🔄 [RECLASSIFICAÇÃO] Movendo "Sinalizar Inventário" para Backlog...');
+    
+    let pedidosMovidos = 0;
+    let lhsMovidas = [];
+    
+    // Calcular estatísticas de volume se ainda não existir
+    const volumes = Object.keys(lhTripsPlanejáveis).map(lhTrip => lhTripsPlanejáveis[lhTrip].length);
+    const estatisticas = {
+        media: volumes.length > 0 ? volumes.reduce((a, b) => a + b, 0) / volumes.length : 0,
+        percentil10: volumes.length > 0 ? volumes.sort((a, b) => a - b)[Math.floor(volumes.length * 0.1)] : 0
+    };
+    
+    // Encontrar nomes das colunas
+    const primeiroRegistro = dadosAtuais[0] || {};
+    const todasColunasDisponiveis = Object.keys(primeiroRegistro);
+    
+    const colunaLH = todasColunasDisponiveis.find(col =>
+        col.toLowerCase().includes('lh trip') ||
+        col.toLowerCase().includes('lh_trip') ||
+        col.toLowerCase().includes('lhtask')
+    ) || 'LH Trip';
+    
+    const colunaStatus = todasColunasDisponiveis.find(col =>
+        col.toLowerCase() === 'status' ||
+        col.toLowerCase().includes('status')
+    ) || 'Status';
+    
+    // Percorrer todas as LHs planejáveis
+    const lhsParaRemover = [];
+    
+    for (const lhTrip in lhTripsPlanejáveis) {
+        const pedidos = lhTripsPlanejáveis[lhTrip];
+        const qtdPedidos = pedidos.length;
+        
+        // Buscar dados da planilha para esta LH
+        const dadosPlanilhaLH = buscarDadosPlanilhaPorStation(lhTrip);
+        
+        // Verificar se é baixo volume
+        const isBaixoVolume = verificarLHBaixoVolume(qtdPedidos, estatisticas);
+        
+        if (isBaixoVolume && dadosPlanilhaLH) {
+            // Verificar se previsão já passou
+            let previsaoPassou = false;
+            try {
+                const previsaoFinalCandidatos = [
+                    dadosPlanilhaLH.previsao_final,
+                    dadosPlanilhaLH['Previsão Final'],
+                    dadosPlanilhaLH['previsão_final'],
+                    dadosPlanilhaLH.PREVISAO_FINAL
+                ].filter(p => p && String(p).trim() !== '');
+                
+                if (previsaoFinalCandidatos.length > 0) {
+                    const previsaoFinal = String(previsaoFinalCandidatos[0]).trim();
+                    const dataPrevisao = new Date(previsaoFinal);
+                    const dataHoje = new Date();
+                    dataHoje.setHours(23, 59, 59, 999); // Fim do dia de hoje
+                    
+                    if (!isNaN(dataPrevisao.getTime())) {
+                        // Considera que passou se for hoje ou antes
+                        previsaoPassou = dataPrevisao <= dataHoje;
+                    }
+                }
+            } catch (e) {
+                // Se der erro, considerar que passou
+                previsaoPassou = true;
+            }
+            
+            // Se é baixo volume E previsão já passou → Sinalizar Inventário → Backlog
+            if (previsaoPassou) {
+                console.log(`   📦 Movendo LH ${lhTrip} (${pedidos.length} pedidos, baixo volume + previsão passada) para Backlog`);
+                
+                // Mover pedidos para backlog
+                pedidos.forEach(pedido => {
+                    // Marcar a LH original
+                    pedido._lhOriginal = lhTrip;
+                    // Renomear para Backlog
+                    pedido[colunaLH] = 'Backlog';
+                    // Marcar status
+                    pedido[colunaStatus] = 'Sinalizar Inventário';
+                    
+                    // Adicionar ao array de backlog
+                    pedidosBacklogPorStatus.push(pedido);
+                    pedidosMovidos++;
+                });
+                
+                // Adicionar ao objeto de backlog agrupado
+                if (!lhTripsBacklog[lhTrip]) {
+                    lhTripsBacklog[lhTrip] = [];
+                }
+                lhTripsBacklog[lhTrip].push(...pedidos);
+                
+                // Marcar para remoção
+                lhsParaRemover.push(lhTrip);
+                lhsMovidas.push(lhTrip);
+            }
+        }
+    }
+    
+    // Remover LHs das planejáveis
+    lhsParaRemover.forEach(lhTrip => {
+        delete lhTripsPlanejáveis[lhTrip];
+    });
+    
+    if (pedidosMovidos > 0) {
+        console.log(`✅ [RECLASSIFICAÇÃO] ${pedidosMovidos} pedidos movidos para Backlog`);
+        console.log(`📊 [RECLASSIFICAÇÃO] ${lhsMovidas.length} LHs reclassificadas: ${lhsMovidas.join(', ')}`);
+        console.log(`📊 [RECLASSIFICAÇÃO] Novo total Backlog: ${pedidosBacklogPorStatus.length} pedidos\n`);
+    } else {
+        console.log(`ℹ️ [RECLASSIFICAÇÃO] Nenhum pedido "Sinalizar Inventário" encontrado\n`);
+    }
 }
 
 // Estado para Ciclos (OpsClock e Outbound)
@@ -771,6 +895,9 @@ function processarDados() {
     console.log(`📊 SEPARAÇÃO POR STATUS:`);
     console.log(`   🔴 Backlog: ${totalBacklog} pedidos em ${lhsBacklog} LHs originais`);
     console.log(`   🟢 Planejável: ${totalPlanejavel} pedidos em ${lhsPlanejáveis} LHs`);
+    
+    // 🆕 PÓS-PROCESSAMENTO: Mover pedidos "Sinalizar Inventário" para Backlog
+    reclassificarSinalizarInventarioParaBacklog();
     
     // Atualizar interface
     renderizarListaLHs();
@@ -3195,31 +3322,44 @@ function calcularStatusLH(dadosPlanilhaLH, qtdPedidos = null, estatisticas = nul
         let previsaoFutura = false;
         if (previsaoFinal) {
             try {
-                // Separar data da hora se existir (ex: "13/02/2026 07:48:18" -> "13/02/2026")
-                const apenasData = previsaoFinal.split(' ')[0];
-                console.log(`   📅 Data extraída: "${apenasData}"`);
+                // Tentar converter a data completa (com hora) primeiro
+                let dataPrevisao = new Date(previsaoFinal);
                 
-                // Converter previsão para Date
-                const partesData = apenasData.split('/');
-                if (partesData.length === 3) {
-                    const dia = parseInt(partesData[0]);
-                    const mes = parseInt(partesData[1]) - 1;
-                    const ano = parseInt(partesData[2]);
+                // Se não conseguiu, tentar formato brasileiro
+                if (isNaN(dataPrevisao.getTime())) {
+                    const apenasData = previsaoFinal.split(' ')[0];
+                    console.log(`   📅 Data extraída: "${apenasData}"`);
                     
-                    const dataPrevisao = new Date(ano, mes, dia);
-                    const hoje = new Date();
-                    hoje.setHours(0, 0, 0, 0);
-                    dataPrevisao.setHours(0, 0, 0, 0);
+                    const partesData = apenasData.split('/');
+                    if (partesData.length === 3) {
+                        const dia = parseInt(partesData[0]);
+                        const mes = parseInt(partesData[1]) - 1;
+                        const ano = parseInt(partesData[2]);
+                        
+                        // Se tem hora, extrair também
+                        const partesHora = previsaoFinal.split(' ')[1]?.split(':');
+                        if (partesHora && partesHora.length >= 2) {
+                            const hora = parseInt(partesHora[0]);
+                            const minuto = parseInt(partesHora[1]);
+                            dataPrevisao = new Date(ano, mes, dia, hora, minuto);
+                        } else {
+                            dataPrevisao = new Date(ano, mes, dia);
+                        }
+                    }
+                }
+                
+                if (!isNaN(dataPrevisao.getTime())) {
+                    const agora = new Date();
                     
-                    console.log(`   📅 Data previsão: ${dataPrevisao.toLocaleDateString('pt-BR')}`);
-                    console.log(`   📅 Data hoje: ${hoje.toLocaleDateString('pt-BR')}`);
+                    console.log(`   📅 Data previsão: ${dataPrevisao.toLocaleString('pt-BR')}`);
+                    console.log(`   📅 Agora: ${agora.toLocaleString('pt-BR')}`);
                     
-                    // Se previsão é hoje ou futura, não sinalizar inventário
-                    if (dataPrevisao >= hoje) {
+                    // Se previsão é no futuro, não sinalizar inventário
+                    if (dataPrevisao > agora) {
                         previsaoFutura = true;
-                        console.log(`   ✅ Previsão futura (${apenasData}) - NÃO sinalizar inventário`);
+                        console.log(`   ✅ Previsão futura - NÃO sinalizar inventário`);
                     } else {
-                        console.log(`   ⚠️ Previsão passada (${apenasData}) - PODE sinalizar inventário`);
+                        console.log(`   ⚠️ Previsão já passou - PODE sinalizar inventário`);
                     }
                 }
             } catch (e) {
@@ -4660,19 +4800,23 @@ async function gerarArquivoPlanejamento() {
             // Usar mesma função de ID que foi usada na seleção
             const id = getShipmentIdFromPedido(pedido, index);
             
-            // Debug para pedidos lixo
-            const lhTrip = pedido['LH Trip'] || pedido['LH_TRIP'] || pedido['lh_trip'] || '';
-            const isLixo = lhTrip && (lhTrip === 'LT0Q2F01YEIJ1' || lhTrip === 'LT1Q2I01ZC4C1' || lhTrip === 'LT0Q2B01YKHZ1' || lhTrip === 'LT1Q2901YTE01');
+            // Pegar LH Trip atual do pedido
+            const lhTripAtual = pedido['LH Trip'] || pedido['LH_TRIP'] || pedido['lh_trip'] || '';
             
-            if (isLixo) {
-                console.log(`🔍 [DEBUG LIXO] Verificando pedido LH ${lhTrip}:`);
-                console.log(`   ID gerado: ${id}`);
-                console.log(`   Está selecionado? ${pedidosBacklogSelecionados.has(id)}`);
-            }
+            // Verificar se é lixo sistêmico
+            const isLixoSistemico = lhsLixoSistemico.some(lixo => lixo.lh === lhTripAtual);
+            
+            // Verificar se é um pedido que deve ser "Backlog"
+            // 1. Já está marcado como "Backlog" na coluna
+            // 2. Tem _lhOriginal (foi reclassificado)
+            // 3. É lixo sistêmico
+            const deveSerBacklog = lhTripAtual === 'Backlog' || 
+                                   pedido._lhOriginal !== undefined || 
+                                   isLixoSistemico;
             
             if (pedidosBacklogSelecionados.has(id)) {
-                // ✅ Se for pedido de LH lixo sistêmico, substituir LH Trip por "Backlog"
-                if (isLixo) {
+                // ✅ Se deve ser Backlog, garantir que LH Trip = "Backlog"
+                if (deveSerBacklog) {
                     // Criar cópia do pedido para não modificar o original
                     const pedidoCopia = { ...pedido };
                     
@@ -4682,14 +4826,17 @@ async function gerarArquivoPlanejamento() {
                     if (pedidoCopia['lh_trip']) pedidoCopia['lh_trip'] = 'Backlog';
                     
                     pedidosPlanejamento.push(pedidoCopia);
-                    console.log(`   ✅ ADICIONADO ao planejamento com LH Trip = 'Backlog'!`);
+                    
+                    if (isLixoSistemico) {
+                        console.log(`   ✅ ADICIONADO (lixo sistêmico: ${lhTripAtual}) com LH Trip = 'Backlog'!`);
+                    } else if (pedido._lhOriginal) {
+                        console.log(`   ✅ ADICIONADO (reclassificado de ${pedido._lhOriginal}) com LH Trip = 'Backlog'!`);
+                    }
                 } else {
                     pedidosPlanejamento.push(pedido);
                 }
                 
                 backlogAdicionado++;
-            } else if (isLixo) {
-                console.log(`   ❌ NÃO adicionado (ID não encontrado nos selecionados)`);
             }
         });
         
@@ -7429,22 +7576,380 @@ function gerarRelatorioFinal() {
 
 // ======================= SINCRONIZAR LHs SPX =======================
 
+/**
+ * Sincroniza LHs visíveis com dados do SPX e gera CSV
+ */
+async function sincronizarLHsSPX() {
+    try {
+        // Pegar todas as LHs visíveis na tabela
+        const lhsVisiveis = obterLHsVisiveis();
+        
+        if (lhsVisiveis.length === 0) {
+            alert('❌ Nenhuma LH encontrada para sincronizar!');
+            return;
+        }
+        
+        console.log(`🔍 [SPX] Sincronizando ${lhsVisiveis.length} LH(s)...`);
+        
+        // Verificar se tem pasta da station
+        if (!pastaStationAtual) {
+            alert('❌ Pasta da station não encontrada!\nCarregue os dados primeiro.');
+            return;
+        }
+        
+        // Verificar se tem nome da station
+        if (!stationAtualNome) {
+            alert('❌ Nome da station não identificado!\nCarregue os dados primeiro.');
+            return;
+        }
+        
+        // Mostrar loading
+        const btnSincronizar = document.getElementById('btnSincronizarLHs');
+        const textoOriginal = btnSincronizar.innerHTML;
+        btnSincronizar.disabled = true;
+        btnSincronizar.innerHTML = '⏳ Sincronizando...';
+        
+        // Chamar IPC para buscar no SPX
+        const resultado = await ipcRenderer.invoke('sincronizar-lhs-spx', {
+            lhIds: lhsVisiveis,
+            stationFolder: pastaStationAtual,
+            currentStationName: stationAtualNome
+        });
+        
+        if (resultado.success) {
+            console.log('✅ [SPX] Sincronização concluída:', resultado.data);
+            
+            // Mostrar resumo
+            const msg = `✅ Sincronização SPX concluída!\n\n` +
+                  `📊 Total de LHs: ${resultado.data.total}\n` +
+                  `✅ Encontradas: ${resultado.data.encontradas}\n` +
+                  `❌ Não encontradas: ${resultado.data.erros}\n\n`;
+            
+            if (resultado.data.csvPath) {
+                alert(msg + `📄 Relatório CSV gerado:\n${resultado.data.csvPath}\n\nAbra o arquivo para ver os detalhes completos!`);
+                
+                // Opcionalmente, abrir o arquivo automaticamente
+                if (confirm('Deseja abrir o relatório agora?')) {
+                    await ipcRenderer.invoke('abrir-arquivo', resultado.data.csvPath);
+                }
+                
+                // Processar e atualizar visual na tabela
+                if (resultado.data.resultados && resultado.data.resultados.length > 0) {
+                    processarResultadosSPXComCSV(resultado.data.resultados);
+                }
+            } else {
+                alert(msg + '⚠️ Nenhuma LH foi encontrada no SPX.');
+            }
+        } else {
+            console.error('❌ [SPX] Erro:', resultado.error);
+            alert(`❌ Erro na sincronização:\n${resultado.error}`);
+        }
+        
+        // Restaurar botão
+        btnSincronizar.disabled = false;
+        btnSincronizar.innerHTML = textoOriginal;
+        
+    } catch (error) {
+        console.error('❌ [SPX] Erro fatal:', error);
+        alert(`❌ Erro fatal:\n${error.message}`);
+    }
+}
+
+/**
+ * Obtém lista de LHs visíveis na tabela atual
+ */
+function obterLHsVisiveis() {
+    const lhs = [];
+    
+    // Tentar múltiplas estratégias para encontrar a tabela
+    let tbody = null;
+    
+    // Estratégia 1: Verificar qual aba está ativa
+    const abaAtiva = document.querySelector('.tab.active');
+    console.log('🔍 [SPX] Aba ativa:', abaAtiva ? abaAtiva.getAttribute('data-tab') : 'nenhuma');
+    
+    if (abaAtiva) {
+        const dataTab = abaAtiva.getAttribute('data-tab');
+        if (dataTab === 'planejamento') {
+            tbody = document.getElementById('tbodyPlanejamento');
+            console.log('📋 [SPX] Usando tabela: Planejamento Hub');
+        } else if (dataTab === 'lh-trips') {
+            tbody = document.getElementById('tbodyLHTrips');
+            console.log('🚚 [SPX] Usando tabela: LH Trips');
+        }
+    }
+    
+    // Estratégia 2: Se não encontrou, tenta todas as tabelas visíveis
+    if (!tbody) {
+        console.log('⚠️ [SPX] Tentando encontrar tabela visível...');
+        const tbodies = [
+            document.getElementById('tbodyPlanejamento'),
+            document.getElementById('tbodyLHTrips')
+        ];
+        
+        for (const tb of tbodies) {
+            if (tb && tb.offsetParent !== null) { // Verifica se está visível
+                tbody = tb;
+                console.log('✅ [SPX] Tabela visível encontrada!');
+                break;
+            }
+        }
+    }
+    
+    if (!tbody) {
+        console.error('❌ [SPX] Nenhuma tabela encontrada!');
+        return lhs;
+    }
+    
+    const linhas = tbody.querySelectorAll('tr');
+    console.log(`🔍 [SPX] Encontradas ${linhas.length} linhas na tabela`);
+    
+    linhas.forEach((linha, index) => {
+        // Procurar pela célula com classe 'lh-trip-cell' ao invés de usar índice fixo
+        const celulaLH = linha.querySelector('td.lh-trip-cell');
+        
+        if (celulaLH) {
+            const lhId = celulaLH.textContent.trim();
+            console.log(`   🔍 Linha ${index}: LH = "${lhId}"`);
+            
+            if (lhId && lhId !== '-' && lhId !== '' && !lhs.includes(lhId)) {
+                lhs.push(lhId);
+                console.log(`   ✅ ${index + 1}. ${lhId}`);
+            }
+        } else {
+            console.log(`   ⚠️ Linha ${index}: Sem célula lh-trip-cell`);
+        }
+    });
+    
+    if (lhs.length > 5) {
+        console.log(`   ... e mais ${lhs.length - 5} LHs`);
+    }
+    
+    console.log(`✅ [SPX] Total de LHs encontradas: ${lhs.length}`);
+    return lhs;
+}
+
+/**
+ * Processa resultados do SPX e atualiza status visual (versão CSV)
+ */
+function processarResultadosSPXComCSV(resultados) {
+    console.log('📊 [SPX] Processando resultados do CSV...');
+    
+    // Encontrar tabela ativa
+    let tbody = null;
+    const abaAtiva = document.querySelector('.tab.active');
+    
+    if (abaAtiva) {
+        const dataTab = abaAtiva.getAttribute('data-tab');
+        if (dataTab === 'planejamento') {
+            tbody = document.getElementById('tbodyPlanejamento');
+        } else if (dataTab === 'lh-trips') {
+            tbody = document.getElementById('tbodyLHTrips');
+        }
+    }
+    
+    // Fallback
+    if (!tbody) {
+        const tbodies = [
+            document.getElementById('tbodyPlanejamento'),
+            document.getElementById('tbodyLHTrips')
+        ];
+        for (const tb of tbodies) {
+            if (tb && tb.offsetParent !== null) {
+                tbody = tb;
+                break;
+            }
+        }
+    }
+    
+    if (!tbody) {
+        console.error('❌ [SPX] Nenhuma tabela encontrada para atualizar!');
+        return;
+    }
+    
+    let atualizadas = 0;
+    
+    resultados.forEach(resultado => {
+        const lhId = resultado.lh_id;
+        const dados = resultado.dados;
+        
+        if (!dados) return;
+        
+        const linhas = tbody.querySelectorAll('tr');
+        linhas.forEach(linha => {
+            // Procurar pela célula com classe 'lh-trip-cell'
+            const celulaLH = linha.querySelector('td.lh-trip-cell');
+            
+            if (celulaLH && celulaLH.textContent.trim() === lhId) {
+                // Extrair informações do SPX
+                const stations = dados.trip_station || [];
+                const destino = stations[stations.length - 1] || {};
+                
+                // Status do SPX
+                const statusMap = {
+                    10: "Criado", 20: "Aguardando Motorista", 30: "Embarcando",
+                    40: "Em Trânsito", 50: "Chegou no Destino", 60: "Desembarcando",
+                    80: "Finalizado", 90: "Finalizado", 100: "Cancelado", 200: "Cancelado"
+                };
+                const statusSPX = statusMap[dados.trip_status] || dados.trip_status;
+                
+                // Chegada Real (ata ou eta)
+                const ata = destino.ata && destino.ata > 0 ? new Date(destino.ata * 1000).toLocaleString('pt-BR') : null;
+                const eta = destino.eta && destino.eta > 0 ? new Date(destino.eta * 1000).toLocaleString('pt-BR') : null;
+                const chegadaReal = ata || (eta ? `Est: ${eta}` : "Em trânsito");
+                
+                // Procurar coluna STATUS LH dinamicamente
+                const todasColunas = linha.querySelectorAll('td');
+                let celulaStatus = null;
+                for (let i = 0; i < todasColunas.length; i++) {
+                    const badge = todasColunas[i].querySelector('.badge, .status-badge');
+                    if (badge || todasColunas[i].textContent.includes('Sinalizar Inventário') || 
+                        todasColunas[i].textContent.includes('Em trânsit') ||
+                        todasColunas[i].textContent.includes('No Hub')) {
+                        celulaStatus = todasColunas[i];
+                        break;
+                    }
+                }
+                
+                if (celulaStatus) {
+                    // Não alterar visual, apenas adicionar tooltip
+                    const tooltipText = `📦 SPX INFO:\n\n` +
+                        `Status: ${statusSPX}\n` +
+                        `Chegada Real: ${chegadaReal}\n` +
+                        `Motorista: ${dados.driver_name || 'N/A'}\n` +
+                        `Placa: ${dados.vehicle_number || 'N/A'}`;
+                    
+                    celulaStatus.title = tooltipText;
+                    celulaStatus.style.cursor = 'help';
+                    atualizadas++;
+                    console.log(`   ✅ Tooltip adicionado: ${lhId}`);
+                }
+            }
+        });
+    });
+    
+    console.log(`✅ [SPX] ${atualizadas} linhas atualizadas com tooltip!`);
+}
+
+/**
+ * Processa resultados do SPX e atualiza status visual
+ */
+function processarResultadosSPX(resultados) {
+    console.log('📊 [SPX] Processando resultados...');
+    
+    // Encontrar tabela ativa
+    let tbody = null;
+    const abaAtiva = document.querySelector('.tab.active');
+    
+    if (abaAtiva) {
+        const dataTab = abaAtiva.getAttribute('data-tab');
+        if (dataTab === 'planejamento') {
+            tbody = document.getElementById('tbodyPlanejamento');
+        } else if (dataTab === 'lh-trips') {
+            tbody = document.getElementById('tbodyLHTrips');
+        }
+    }
+    
+    // Fallback: tentar encontrar tabela visível
+    if (!tbody) {
+        const tbodies = [
+            document.getElementById('tbodyPlanejamento'),
+            document.getElementById('tbodyLHTrips')
+        ];
+        for (const tb of tbodies) {
+            if (tb && tb.offsetParent !== null) {
+                tbody = tb;
+                break;
+            }
+        }
+    }
+    
+    if (!tbody) {
+        console.error('❌ [SPX] Nenhuma tabela encontrada para atualizar!');
+        return;
+    }
+    
+    let divergenciasEncontradas = 0;
+    let statusOK = 0;
+    
+    resultados.forEach(resultado => {
+        const lhId = resultado.lh_id;
+        
+        const linhas = tbody.querySelectorAll('tr');
+        linhas.forEach(linha => {
+            // Procurar pela célula com classe 'lh-trip-cell'
+            const celulaLH = linha.querySelector('td.lh-trip-cell');
+            
+            if (celulaLH && celulaLH.textContent.trim() === lhId) {
+                // Procurar coluna STATUS LH
+                const colunas = linha.querySelectorAll('td');
+                let celulaStatus = null;
+                for (let i = 0; i < colunas.length; i++) {
+                    const badge = colunas[i].querySelector('.badge, .status-badge');
+                    if (badge || colunas[i].textContent.includes('Sinalizar Inventário') || 
+                            colunas[i].textContent.includes('Em trânsito') ||
+                            colunas[i].textContent.includes('No Hub')) {
+                            celulaStatus = colunas[i];
+                            break;
+                        }
+                    }
+                    
+                    if (celulaStatus && resultado.encontrada) {
+                        const statusAtual = celulaStatus.textContent.trim();
+                        
+                        // Validar divergência
+                        let divergencia = false;
+                        const statusLower = statusAtual.toLowerCase();
+                        
+                        if (resultado.descarregada && (statusLower.includes('em trânsito') || statusLower.includes('em transito'))) {
+                            divergencia = true;
+                        } else if (resultado.chegou_hub && (statusLower.includes('em trânsito') || statusLower.includes('em transito'))) {
+                            divergencia = true;
+                        }
+                        
+                        // Atualizar visual
+                        if (divergencia) {
+                            divergenciasEncontradas++;
+                            celulaStatus.innerHTML = `
+                                <div style="display: flex; flex-direction: column; gap: 2px;">
+                                    <span style="color: #ff9800; font-weight: 600;">⚠️ ${statusAtual}</span>
+                                    <span style="font-size: 11px; color: #4caf50; font-weight: 600;">SPX: ${resultado.status_spx}</span>
+                                </div>
+                            `;
+                            celulaStatus.title = `⚠️ DIVERGÊNCIA DETECTADA!\n\nPlanilha: ${statusAtual}\nSPX: ${resultado.status_spx}\n\nATA (Chegada): ${resultado.ata || 'N/A'}\nUnloaded (Descarregada): ${resultado.unloaded_time || 'N/A'}`;
+                            celulaStatus.style.background = '#fff3cd';
+                            celulaStatus.style.padding = '8px';
+                            celulaStatus.style.borderRadius = '4px';
+                            celulaStatus.style.borderLeft = '4px solid #ff9800';
+                            console.log(`   ⚠️ ${lhId}: DIVERGÊNCIA - ${resultado.status_spx}`);
+                        } else {
+                            statusOK++;
+                            celulaStatus.title = `✅ Status OK\n\nSPX: ${resultado.status_spx}\nATA: ${resultado.ata || 'N/A'}\nUnloaded: ${resultado.unloaded_time || 'N/A'}`;
+                            celulaStatus.style.borderLeft = '3px solid #4caf50';
+                            console.log(`   ✅ ${lhId}: OK - ${resultado.status_spx}`);
+                        }
+                    }
+                }
+        });
+    });
+    
+    console.log(`\n📊 [SPX] RESUMO:`);
+    console.log(`   ✅ Status OK: ${statusOK}`);
+    console.log(`   ⚠️ Divergências: ${divergenciasEncontradas}`);
+    console.log('✅ [SPX] Resultados processados!');
+}
+
 // Inicializar botão e modal após DOM carregar
 document.addEventListener('DOMContentLoaded', () => {
     const btnSincronizarLHs = document.getElementById('btnSincronizarLHs');
     if (btnSincronizarLHs) {
-        btnSincronizarLHs.addEventListener('click', () => {
-            console.log('👍 [MODAL] Botão Sincronizar LHs clicado');
-            document.getElementById('modalSincronizarLHs').style.display = 'flex';
-            // Resetar estado do modal
-            document.getElementById('modalSincProgresso').style.display = 'none';
-            document.getElementById('modalSincResultado').style.display = 'none';
-            document.getElementById('btnExecutarSinc').disabled = false;
-            document.getElementById('btnCancelarSinc').disabled = false;
+        btnSincronizarLHs.addEventListener('click', async () => {
+            console.log('🔍 [SPX] Botão Sincronizar LHs SPX clicado');
+            await sincronizarLHsSPX();
         });
-        console.log('✅ [MODAL] Listener do botão Sincronizar LHs registrado');
+        console.log('✅ [SPX] Listener do botão Sincronizar LHs SPX registrado');
     } else {
-        console.error('❌ [MODAL] Botão btnSincronizarLHs não encontrado!');
+        console.error('❌ [SPX] Botão btnSincronizarLHs não encontrado!');
     }
 });
 
