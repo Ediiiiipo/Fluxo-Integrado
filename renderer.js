@@ -4800,42 +4800,18 @@ async function gerarArquivoPlanejamento() {
             // Usar mesma função de ID que foi usada na seleção
             const id = getShipmentIdFromPedido(pedido, index);
             
-            // Pegar LH Trip atual do pedido
-            const lhTripAtual = pedido['LH Trip'] || pedido['LH_TRIP'] || pedido['lh_trip'] || '';
-            
-            // Verificar se é lixo sistêmico
-            const isLixoSistemico = lhsLixoSistemico.some(lixo => lixo.lh === lhTripAtual);
-            
-            // Verificar se é um pedido que deve ser "Backlog"
-            // 1. Já está marcado como "Backlog" na coluna
-            // 2. Tem _lhOriginal (foi reclassificado)
-            // 3. É lixo sistêmico
-            const deveSerBacklog = lhTripAtual === 'Backlog' || 
-                                   pedido._lhOriginal !== undefined || 
-                                   isLixoSistemico;
-            
             if (pedidosBacklogSelecionados.has(id)) {
-                // ✅ Se deve ser Backlog, garantir que LH Trip = "Backlog"
-                if (deveSerBacklog) {
-                    // Criar cópia do pedido para não modificar o original
-                    const pedidoCopia = { ...pedido };
-                    
-                    // Substituir LH Trip por "Backlog"
-                    if (pedidoCopia['LH Trip']) pedidoCopia['LH Trip'] = 'Backlog';
-                    if (pedidoCopia['LH_TRIP']) pedidoCopia['LH_TRIP'] = 'Backlog';
-                    if (pedidoCopia['lh_trip']) pedidoCopia['lh_trip'] = 'Backlog';
-                    
-                    pedidosPlanejamento.push(pedidoCopia);
-                    
-                    if (isLixoSistemico) {
-                        console.log(`   ✅ ADICIONADO (lixo sistêmico: ${lhTripAtual}) com LH Trip = 'Backlog'!`);
-                    } else if (pedido._lhOriginal) {
-                        console.log(`   ✅ ADICIONADO (reclassificado de ${pedido._lhOriginal}) com LH Trip = 'Backlog'!`);
-                    }
-                } else {
-                    pedidosPlanejamento.push(pedido);
-                }
+                // 🔥 SEMPRE criar cópia e renomear para "Backlog"
+                // Todo pedido que está em pedidosBacklogPorStatus DEVE ser Backlog
+                const pedidoCopia = { ...pedido };
                 
+                // Substituir LH Trip por "Backlog" em TODAS as variações
+                if (pedidoCopia['LH Trip']) pedidoCopia['LH Trip'] = 'Backlog';
+                if (pedidoCopia['LH_TRIP']) pedidoCopia['LH_TRIP'] = 'Backlog';
+                if (pedidoCopia['lh_trip']) pedidoCopia['lh_trip'] = 'Backlog';
+                if (pedidoCopia['LH TRIP']) pedidoCopia['LH TRIP'] = 'Backlog';
+                
+                pedidosPlanejamento.push(pedidoCopia);
                 backlogAdicionado++;
             }
         });
