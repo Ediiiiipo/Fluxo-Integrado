@@ -206,6 +206,9 @@ function reclassificarSinalizarInventarioParaBacklog() {
 let dadosOpsClock = []; // Horários dos ciclos por station
 let dadosOutbound = []; // Capacidade por ciclo/data
 let cicloSelecionado = 'Todos'; // Filtro de ciclo atual
+
+// Cache de validações SPX (persiste entre trocas de ciclo)
+let cacheSPX = new Map(); // Map<lhId, {status, statusCodigo, chegadaReal, timestamp}>
 let dataCicloSelecionada = null; // Data selecionada para o planejamento do ciclo
 
 // Estado para CAP Manual
@@ -3318,7 +3321,44 @@ function parsearDataHora(str) {
 
 // Função para calcular o status da LH baseado nas colunas da planilha
 function calcularStatusLH(dadosPlanilhaLH, qtdPedidos = null, estatisticas = null, cicloSelecionado = null) {
-    const lhTrip = dadosPlanilhaLH?.lh_trip || dadosPlanilhaLH?.['LH Trip'] || 'N/A';
+    // Extrair LH Trip com múltiplos fallbacks (PRIORIDADE: trip_number é o campo correto!)
+    const lhTrip = dadosPlanilhaLH?.trip_number ||  // ← CORRETO!
+                   dadosPlanilhaLH?.lh_trip || 
+                   dadosPlanilhaLH?.['LH Trip'] || 
+                   dadosPlanilhaLH?.['LH_TRIP'] ||
+                   dadosPlanilhaLH?.['lh trip'] ||
+                   dadosPlanilhaLH?.lhTrip ||
+                   'N/A';
+    
+    // PRIORIDADE 1: Verificar cache SPX primeiro (sobrescreve qualquer cálculo)
+    console.log(`   🔍 [CACHE CHECK] Verificando cache SPX para ${lhTrip}... (cache tem ${cacheSPX.size} entradas)`);
+    
+    // Debug: mostrar chaves do cache
+    if (cacheSPX.size > 0 && lhTrip !== 'N/A') {
+        const cacheKeys = Array.from(cacheSPX.keys());
+        console.log(`   📋 [CACHE KEYS] Chaves no cache:`, cacheKeys);
+        console.log(`   🔍 [CACHE SEARCH] Procurando por: "${lhTrip}"`);
+    }
+    
+    if (cacheSPX.has(lhTrip)) {
+        const validacaoSPX = cacheSPX.get(lhTrip);
+        console.log(`   💾 [CACHE SPX HIT] ✅✅✅ Usando validação SPX PERMANENTE: ${lhTrip} → ${validacaoSPX.statusCodigo}`);
+        return {
+            codigo: validacaoSPX.statusCodigo,
+            texto: validacaoSPX.status,
+            classe: `status-${validacaoSPX.statusCodigo.toLowerCase()}`,
+            icone: validacaoSPX.statusCodigo === 'P0' ? '✅' : '🚚',
+            isBloqueada: false, // Nunca bloqueia se veio do SPX
+            _spxValidado: true
+        };
+    } else {
+        if (lhTrip === 'N/A') {
+            const props = Object.keys(dadosPlanilhaLH || {});
+            console.log(`   ⚠️ [CACHE WARNING] LH Trip = N/A! Propriedades do objeto (${props.length}):`, props);
+        } else {
+            console.log(`   ❌ [CACHE SPX MISS] ${lhTrip} não encontrado no cache`);
+        }
+    }
     
     if (!dadosPlanilhaLH) {
         // LH sem dados na planilha
@@ -4100,12 +4140,14 @@ function renderizarTabelaPlanejamento() {
         
         // Verificar se a LH está bloqueada (status P3 - fora do prazo)
         const statusLH = row.status_lh;
-        const lhBloqueada = statusLH && statusLH.codigo === 'P3';
+        
+        // IMPORTANTE: Se foi validado pelo SPX, NUNCA bloqueia
+        const lhBloqueada = statusLH && !statusLH._spxValidado && statusLH.isBloqueada;
         const motivoBloqueio = lhBloqueada ? 'LH em trânsito - não chegará a tempo para este ciclo' : '';
         
         // DEBUG: Log do status na renderização
-        if (statusLH && (statusLH.codigo === 'P2' || statusLH.codigo === 'P3')) {
-            console.log(`🖥️ RENDERIZAÇÃO - LH: ${row.lh_trip}, Status: ${statusLH.codigo} (${statusLH.texto}), Bloqueada: ${lhBloqueada}`);
+        if (statusLH && (statusLH.codigo === 'P2' || statusLH.codigo === 'P3' || statusLH._spxValidado)) {
+            console.log(`🖥️ RENDERIZAÇÃO - LH: ${row.lh_trip}, Status: ${statusLH.codigo} (${statusLH.texto}), SPX Validado: ${!!statusLH._spxValidado}, Bloqueada: ${lhBloqueada}`);
         }
         
         // Verificar se é LH com estouro no piso (para destaque especial)
@@ -7774,7 +7816,7 @@ function obterLHsVisiveis() {
  * Processa resultados do SPX e atualiza status visual (versão CSV)
  */
 function processarResultadosSPXComCSV(resultados) {
-    console.log('📊 [SPX] Processando resultados do CSV...');
+    console.log('📊 [SPX] Processando resultados do CSV e validando status...');
     
     // Encontrar tabela ativa
     let tbody = null;
@@ -7809,6 +7851,8 @@ function processarResultadosSPXComCSV(resultados) {
     }
     
     let atualizadas = 0;
+    let statusAtualizados = 0;
+    let horariosAtualizados = 0;
     
     resultados.forEach(resultado => {
         const lhId = resultado.lh_id;
@@ -7828,48 +7872,321 @@ function processarResultadosSPXComCSV(resultados) {
                 
                 // Status do SPX
                 const statusMap = {
-                    10: "Criado", 20: "Aguardando Motorista", 30: "Embarcando",
-                    40: "Em Trânsito", 50: "Chegou no Destino", 60: "Desembarcando",
-                    80: "Finalizado", 90: "Finalizado", 100: "Cancelado", 200: "Cancelado"
+                    10: "Criado", 
+                    20: "Aguardando Motorista", 
+                    30: "Embarcando",
+                    40: "Em Trânsito", 
+                    50: "Chegou no Destino", 
+                    60: "Desembarcando",
+                    80: "Finalizado", 
+                    90: "Finalizado", 
+                    100: "Cancelado", 
+                    200: "Cancelado"
                 };
                 const statusSPX = statusMap[dados.trip_status] || dados.trip_status;
                 
                 // Chegada Real (ata ou eta)
-                const ata = destino.ata && destino.ata > 0 ? new Date(destino.ata * 1000).toLocaleString('pt-BR') : null;
-                const eta = destino.eta && destino.eta > 0 ? new Date(destino.eta * 1000).toLocaleString('pt-BR') : null;
-                const chegadaReal = ata || (eta ? `Est: ${eta}` : "Em trânsito");
+                const ata = destino.ata && destino.ata > 0 ? new Date(destino.ata * 1000) : null;
+                const eta = destino.eta && destino.eta > 0 ? new Date(destino.eta * 1000) : null;
+                const chegadaReal = ata || eta;
+                const chegadaRealStr = chegadaReal ? chegadaReal.toLocaleString('pt-BR') : "Em trânsito";
                 
-                // Procurar coluna STATUS LH dinamicamente
+                // Mapeamento Status SPX → Status Front
+                const statusFrontMap = {
+                    "Finalizado": { codigo: "P0", texto: "✅ No Piso", classe: "status-p0", icone: "✅" },
+                    "Desembarcando": { codigo: "P0D", texto: "🚚 Aguard. Descarregamento", classe: "status-p0-desc", icone: "🚚" },
+                    "Chegou no Destino": { codigo: "P0D", texto: "🚚 Aguard. Descarregamento", classe: "status-p0-desc", icone: "🚚" },
+                    "Em Trânsito": null, // Mantém status calculado
+                    "Embarcando": null,
+                    "Criado": null,
+                    "Aguardando Motorista": null
+                };
+                
+                // Procurar coluna STATUS LH dinamicamente (corrigido para não pegar coluna LH TRIP)
                 const todasColunas = linha.querySelectorAll('td');
                 let celulaStatus = null;
+                let indexStatus = -1;
+                
+                // IMPORTANTE: Ignorar a primeira coluna (TIPO) que também tem badges
+                // Começar da segunda coluna em diante
+                for (let i = 1; i < todasColunas.length; i++) {
+                    const celula = todasColunas[i];
+                    const badge = celula.querySelector('.badge, .status-badge');
+                    const texto = celula.textContent.trim();
+                    
+                    // IGNORAR se for coluna TIPO (Normal, Backlog)
+                    if (texto === 'Normal' || texto === 'Backlog') {
+                        continue;
+                    }
+                    
+                    // IGNORAR se for coluna LH TRIP (código da LH)
+                    if (celula.classList.contains('lh-trip-cell')) {
+                        continue;
+                    }
+                    
+                    // Verificar se contém STATUS conhecidos (não TIPO)
+                    const isStatusColumn = 
+                        texto.includes('No Piso') ||
+                        texto.includes('Aguard') ||
+                        texto.includes('Descarregamento') ||
+                        texto.includes('Sinalizar') ||
+                        texto.includes('Inventário') ||
+                        texto.includes('Em transito') ||
+                        texto.includes('Em trânsito') ||
+                        texto.includes('fora do prazo') ||
+                        texto.includes('dentro do prazo') ||
+                        texto.includes('No Hub') ||
+                        (badge && (
+                            badge.classList.contains('status-p0') ||
+                            badge.classList.contains('status-p0-desc') ||
+                            badge.classList.contains('status-p1') ||
+                            badge.classList.contains('status-p2') ||
+                            badge.classList.contains('status-p3') ||
+                            badge.classList.contains('status-p0i')
+                        ));
+                    
+                    if (isStatusColumn) {
+                        celulaStatus = celula;
+                        indexStatus = i;
+                        console.log(`   🎯 Coluna STATUS encontrada no índice ${i}: "${texto}"`);
+                        break;
+                    }
+                }
+                
+                // Procurar coluna PREVISÃO HORA
+                let celulaPrevisaoHora = null;
                 for (let i = 0; i < todasColunas.length; i++) {
-                    const badge = todasColunas[i].querySelector('.badge, .status-badge');
-                    if (badge || todasColunas[i].textContent.includes('Sinalizar Inventário') || 
-                        todasColunas[i].textContent.includes('Em trânsit') ||
-                        todasColunas[i].textContent.includes('No Hub')) {
-                        celulaStatus = todasColunas[i];
+                    const celula = todasColunas[i];
+                    const texto = celula.textContent.trim();
+                    // Verificar se tem formato de hora (HH:MM:SS ou HH:MM)
+                    if (/^\d{2}:\d{2}(:\d{2})?$/.test(texto)) {
+                        celulaPrevisaoHora = celula;
+                        break;
+                    }
+                }
+                
+                // Procurar coluna TEMPO P/ CORTE (com debug)
+                let celulaTempoCorte = null;
+                console.log(`   🔍 Procurando coluna TEMPO... Total colunas: ${todasColunas.length}`);
+                
+                for (let i = todasColunas.length - 1; i >= 0; i--) {
+                    const celula = todasColunas[i];
+                    const badge = celula.querySelector('.badge');
+                    const texto = celula.textContent.trim();
+                    
+                    if (i >= todasColunas.length - 3) { // Debug últimas 3 colunas
+                        console.log(`      Col ${i}: "${texto}" (badge: ${!!badge})`);
+                    }
+                    
+                    // Verificar se é a coluna de tempo
+                    const isTempoColumn = 
+                        (badge && (
+                            badge.classList.contains('tempo-ok') ||
+                            badge.classList.contains('tempo-apertado') ||
+                            badge.classList.contains('tempo-atrasado')
+                        )) ||
+                        texto.includes('min') || 
+                        texto.includes('Ciclo') ||
+                        texto.includes('encerrado') ||
+                        /^\d+h\d+min$/.test(texto) ||
+                        /^-?\d+min$/.test(texto) ||
+                        texto === '-';
+                    
+                    if (isTempoColumn) {
+                        celulaTempoCorte = celula;
+                        console.log(`   ⏰ Coluna TEMPO encontrada no índice ${i}: "${texto}"`);
                         break;
                     }
                 }
                 
                 if (celulaStatus) {
-                    // Não alterar visual, apenas adicionar tooltip
+                    const statusAtualTexto = celulaStatus.textContent.trim();
+                    const novoStatusFront = statusFrontMap[statusSPX];
+                    
+                    console.log(`🔍 [DEBUG] LH: ${lhId}`);
+                    console.log(`   Status atual (front): "${statusAtualTexto}"`);
+                    console.log(`   Status SPX: "${statusSPX}"`);
+                    console.log(`   Novo status mapeado:`, novoStatusFront);
+                    
+                    // Verificar se precisa atualizar o status
+                    // REGRA: Se SPX tem status definitivo (Finalizado, Desembarcando), SEMPRE atualiza
+                    const statusDefinitivos = ['Finalizado', 'Desembarcando', 'Chegou no Destino'];
+                    const ehStatusDefinitivo = statusDefinitivos.includes(statusSPX);
+                    
+                    // REGRA: Atualizar se tiver novo status E (for definitivo OU status atual for genérico)
+                    const statusGenericos = [
+                        'Em transito',
+                        'Em trânsito', 
+                        'fora do prazo',
+                        'Sinalizar',
+                        'Aguard',
+                        'P2',
+                        'P3'
+                    ];
+                    const ehStatusGenerico = statusGenericos.some(s => statusAtualTexto.includes(s));
+                    
+                    const deveAtualizar = novoStatusFront && (ehStatusDefinitivo || ehStatusGenerico);
+                    
+                    console.log(`   Deve atualizar? ${deveAtualizar} (definitivo: ${ehStatusDefinitivo}, genérico: ${ehStatusGenerico})`);
+                    
+                    if (deveAtualizar && novoStatusFront) {
+                        // IMPORTANTE: Salvar validação SPX no cache ANTES de atualizar visual
+                        cacheSPX.set(lhId, {
+                            status: novoStatusFront.texto,
+                            statusCodigo: novoStatusFront.codigo,
+                            statusSPX: statusSPX,
+                            chegadaReal: chegadaReal ? chegadaReal.toISOString() : null,
+                            timestamp: new Date().toISOString()
+                        });
+                        console.log(`   💾 Validação SPX salva no cache: ${lhId} → ${novoStatusFront.codigo}`);
+                        
+                        // Atualizar o status visual
+                        const badgeExistente = celulaStatus.querySelector('.badge, .status-badge');
+                        if (badgeExistente) {
+                            badgeExistente.textContent = novoStatusFront.texto;
+                            badgeExistente.className = `badge ${novoStatusFront.classe}`;
+                        } else {
+                            celulaStatus.innerHTML = `<span class="badge ${novoStatusFront.classe}">${novoStatusFront.texto}</span>`;
+                        }
+                        
+                        // IMPORTANTE: Atualizar dados subjacentes quando mudar para "No Piso" ou "Aguard. Descarregamento"
+                        if (novoStatusFront.codigo === 'P0' || novoStatusFront.codigo === 'P0D') {
+                            console.log(`   🔄 Atualizando dados subjacentes para ${lhId}...`);
+                            
+                            // 1. Atualizar dados da LH no objeto lhTripsPlanejáveis
+                            if (lhTripsPlanejáveis && lhTripsPlanejáveis[lhId]) {
+                                const pedidosLH = lhTripsPlanejáveis[lhId];
+                                
+                                // Atualizar o objeto dadosPlanilhaLH (se existir)
+                                const dadosLH = buscarDadosPlanilhaPorStation(lhId);
+                                if (dadosLH) {
+                                    // Marcar que chegou
+                                    dadosLH._spx_finalizado = true;
+                                    dadosLH._spx_status = statusSPX;
+                                    if (chegadaReal) {
+                                        dadosLH._spx_chegada_real = chegadaReal;
+                                    }
+                                }
+                                
+                                console.log(`   ✅ Dados da LH ${lhId} atualizados no objeto`);
+                            }
+                            
+                            // 2. Desbloquear visualmente
+                            linha.classList.remove('bloqueada');
+                            linha.style.opacity = '1';
+                            linha.style.pointerEvents = 'auto';
+                            
+                            // 3. Remover atributo data-bloqueada
+                            linha.removeAttribute('data-bloqueada');
+                            linha.dataset.status = novoStatusFront.codigo;
+                            
+                            console.log(`   🔓 LH desbloqueada: ${lhId}`);
+                            
+                            // 4. Limpar tempo de corte COMPLETAMENTE
+                            if (celulaTempoCorte) {
+                                celulaTempoCorte.innerHTML = '';
+                                celulaTempoCorte.textContent = '-';
+                                celulaTempoCorte.style.color = '#6b7280';
+                                celulaTempoCorte.style.fontWeight = 'normal';
+                                celulaTempoCorte.style.textAlign = 'center';
+                                console.log(`   ⏰ Tempo de corte limpo: ${lhId} (LH no piso)`);
+                            }
+                            
+                            // 5. Remover qualquer tooltip de bloqueio
+                            const celulaLH = linha.querySelector('td.lh-trip-cell');
+                            if (celulaLH && celulaLH.title && celulaLH.title.includes('bloqueada')) {
+                                celulaLH.title = '';
+                            }
+                        }
+                        
+                        statusAtualizados++;
+                        console.log(`   ✅ Status atualizado: ${lhId} → ${novoStatusFront.texto} (SPX: ${statusSPX})`);
+                    }
+                    
+                    // Adicionar tooltip com informações completas
                     const tooltipText = `📦 SPX INFO:\n\n` +
                         `Status: ${statusSPX}\n` +
-                        `Chegada Real: ${chegadaReal}\n` +
+                        `Chegada Real: ${chegadaRealStr}\n` +
                         `Motorista: ${dados.driver_name || 'N/A'}\n` +
-                        `Placa: ${dados.vehicle_number || 'N/A'}`;
+                        `Placa: ${dados.vehicle_number || 'N/A'}\n` +
+                        `Tipo: ${dados.vehicle_type || 'N/A'}`;
                     
                     celulaStatus.title = tooltipText;
                     celulaStatus.style.cursor = 'help';
                     atualizadas++;
-                    console.log(`   ✅ Tooltip adicionado: ${lhId}`);
+                    
+                    // Se status for "Finalizado" E tiver chegada real, atualizar PREVISÃO HORA
+                    if (statusSPX === 'Finalizado' && chegadaReal && celulaPrevisaoHora) {
+                        const horaChegada = chegadaReal.toLocaleTimeString('pt-BR', { 
+                            hour: '2-digit', 
+                            minute: '2-digit', 
+                            second: '2-digit' 
+                        });
+                        celulaPrevisaoHora.textContent = horaChegada;
+                        celulaPrevisaoHora.style.fontWeight = 'bold';
+                        celulaPrevisaoHora.style.color = '#10b981'; // Verde
+                        celulaPrevisaoHora.title = `✅ Chegada Real (SPX): ${chegadaRealStr}`;
+                        horariosAtualizados++;
+                        console.log(`   🕐 Horário atualizado: ${lhId} → ${horaChegada}`);
+                    }
                 }
             }
         });
     });
     
-    console.log(`✅ [SPX] ${atualizadas} linhas atualizadas com tooltip!`);
+    console.log(`✅ [SPX] Sincronização concluída:`);
+    console.log(`   📊 ${atualizadas} tooltips adicionados`);
+    console.log(`   🔄 ${statusAtualizados} status atualizados`);
+    console.log(`   🕐 ${horariosAtualizados} horários de chegada atualizados`);
+    
+    // IMPORTANTE: Re-renderizar sugestão de planejamento se houve atualizações
+    if (statusAtualizados > 0) {
+        console.log(`   🔄 Re-renderizando sugestão de planejamento...`);
+        
+        // Re-calcular e atualizar a sugestão
+        try {
+            // Verificar qual ciclo está selecionado
+            const cicloAtivo = document.querySelector('.ciclo-card.ativo');
+            const cicloSelecionado = cicloAtivo ? cicloAtivo.dataset.ciclo : 'Todos';
+            
+            // Re-renderizar a visualização com os novos dados
+            renderizarVisualizacao(cicloSelecionado);
+            
+            console.log(`   ✅ Sugestão re-renderizada com dados atualizados!`);
+        } catch (error) {
+            console.error(`   ❌ Erro ao re-renderizar:`, error);
+        }
+    }
+    
+    // Mostrar notificação visual se houve atualizações
+    if (statusAtualizados > 0 || horariosAtualizados > 0) {
+        const msg = `✅ Status validado com SPX!\n\n` +
+            `🔄 ${statusAtualizados} status atualizado(s)\n` +
+            `🕐 ${horariosAtualizados} horário(s) de chegada atualizado(s)`;
+        
+        // Criar notificação temporária
+        const notif = document.createElement('div');
+        notif.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #10b981;
+            color: white;
+            padding: 16px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 10000;
+            font-weight: 500;
+            animation: slideIn 0.3s ease-out;
+        `;
+        notif.textContent = `✅ ${statusAtualizados + horariosAtualizados} atualizações do SPX!`;
+        document.body.appendChild(notif);
+        
+        setTimeout(() => {
+            notif.style.animation = 'slideOut 0.3s ease-in';
+            setTimeout(() => notif.remove(), 300);
+        }, 3000);
+    }
 }
 
 /**
