@@ -97,6 +97,7 @@ function reclassificarSinalizarInventarioParaBacklog() {
         // Verificar se é baixo volume
         const isBaixoVolume = verificarLHBaixoVolume(qtdPedidos, estatisticas);
         
+        // Caso 1: Tem dados na planilha E é baixo volume → verificar se previsão passou
         if (isBaixoVolume && dadosPlanilhaLH) {
             // Verificar se previsão já passou
             let previsaoPassou = false;
@@ -152,6 +153,38 @@ function reclassificarSinalizarInventarioParaBacklog() {
                 lhsParaRemover.push(lhTrip);
                 lhsMovidas.push(lhTrip);
             }
+        }
+        // Caso 2: NÃO tem dados na planilha E é baixo volume → mover para Backlog
+        else if (isBaixoVolume && !dadosPlanilhaLH) {
+            console.log(`   📦 Movendo LH ${lhTrip} (${pedidos.length} pedidos, baixo volume + sem dados) para Backlog`);
+            
+            // Mover pedidos para backlog
+            pedidos.forEach(pedido => {
+                // Marcar a LH original
+                pedido._lhOriginal = lhTrip;
+                // Renomear para Backlog
+                pedido[colunaLH] = 'Backlog';
+                // Marcar status
+                pedido[colunaStatus] = 'Sinalizar Inventário';
+                
+                // Adicionar ao array de backlog
+                pedidosBacklogPorStatus.push(pedido);
+                pedidosMovidos++;
+            });
+            
+            // Adicionar ao objeto de backlog agrupado
+            if (!lhTripsBacklog[lhTrip]) {
+                lhTripsBacklog[lhTrip] = [];
+            }
+            lhTripsBacklog[lhTrip].push(...pedidos);
+            
+            // Marcar para remoção
+            lhsParaRemover.push(lhTrip);
+            lhsMovidas.push(lhTrip);
+        }
+        // Caso 3: Alto volume sem dados → NÃO mover (mantém planejável)
+        else if (!isBaixoVolume && !dadosPlanilhaLH) {
+            console.log(`   ✅ LH ${lhTrip} (${pedidos.length} pedidos, ALTO volume sem dados) → Mantém planejável`);
         }
     }
     
@@ -3288,8 +3321,27 @@ function calcularStatusLH(dadosPlanilhaLH, qtdPedidos = null, estatisticas = nul
     const lhTrip = dadosPlanilhaLH?.lh_trip || dadosPlanilhaLH?.['LH Trip'] || 'N/A';
     
     if (!dadosPlanilhaLH) {
-        // LH sem dados na planilha -> Sinalizar Inventário (não bloquear)
-        return { codigo: 'P0I', texto: 'Sinalizar Inventário', classe: 'status-p0i', icone: '🔍' };
+        // LH sem dados na planilha
+        console.log(`🔍 [SEM DADOS] LH sem dados na planilha - ${qtdPedidos} pedidos`);
+        
+        // Verificar se é BAIXO volume antes de sinalizar inventário
+        const isBaixoVolume = qtdPedidos !== null && estatisticas && verificarLHBaixoVolume(qtdPedidos, estatisticas);
+        
+        if (isBaixoVolume) {
+            // Baixo volume + sem dados → Sinalizar Inventário
+            console.log(`🔍 LH sem dados + baixo volume (${qtdPedidos} pedidos) → Sinalizar Inventário`);
+            return { codigo: 'P0I', texto: 'Sinalizar Inventário', classe: 'status-p0i', icone: '🔍' };
+        } else {
+            // Alto volume + sem dados → Status genérico P3 (não bloqueia)
+            console.log(`⚠️ LH sem dados mas ALTO volume (${qtdPedidos} pedidos) → P3 genérico`);
+            return { 
+                codigo: 'P3', 
+                texto: 'Em transito - fora do prazo', 
+                classe: 'status-p3', 
+                icone: '⛔',
+                isBloqueada: true 
+            };
+        }
     }
     
     // VERIFICAR BAIXO VOLUME (mas só sinalizar inventário se já passou do prazo)
@@ -3574,13 +3626,26 @@ function calcularEstatisticasVolume(lhsData) {
 function verificarLHBaixoVolume(qtdPedidos, estatisticas) {
     if (!estatisticas || qtdPedidos === 0) return false;
     
-    // Critérios para considerar baixo volume:
-    // 1. Abaixo do percentil 10 (10% menores volumes)
-    // 2. OU abaixo de 30% da média
-    const limitePercentil = estatisticas.percentil10;
-    const limiteMedia = Math.round(estatisticas.media * 0.3);
+    // Limite absoluto máximo: nunca considerar baixo volume se tiver 100+ pedidos
+    // LHs fechadas normalmente têm pelo menos 100 pedidos
+    const LIMITE_ABSOLUTO_MAX = 100;
     
-    const isBaixo = qtdPedidos <= limitePercentil || qtdPedidos <= limiteMedia;
+    // Usar 30% da média como critério, mas com teto de 100 pedidos
+    const limite30Porcento = Math.round(estatisticas.media * 0.30);
+    const limiteMedia = Math.min(limite30Porcento, LIMITE_ABSOLUTO_MAX);
+    
+    // É baixo volume se estiver abaixo do limite
+    const isBaixo = qtdPedidos < limiteMedia;
+    
+    // Debug detalhado para volumes próximos aos limites
+    if (qtdPedidos > 50 && qtdPedidos < 200) {
+        console.log(`🔍 [DEBUG VOLUME] ${qtdPedidos} pedidos:`);
+        console.log(`   📊 Média: ${Math.round(estatisticas.media)}`);
+        console.log(`   📊 Limite 30% média: ${limite30Porcento}`);
+        console.log(`   📊 Limite máximo absoluto: ${LIMITE_ABSOLUTO_MAX}`);
+        console.log(`   📊 Limite USADO: ${limiteMedia}`);
+        console.log(`   📊 É baixo? ${isBaixo ? 'SIM' : 'NÃO'} (${qtdPedidos} < ${limiteMedia})`);
+    }
     
     return isBaixo;
 }
