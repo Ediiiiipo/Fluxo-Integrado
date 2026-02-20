@@ -96,8 +96,8 @@ credenciais.json
 credenciais.example.json
 
 # JSONS
-.lhs_planilha.json
-.dados_infoOpsClock.json
-.LH_busca_especifica.json
-.lhs_planilha.json
-.dados_outbound_capacity.json
+lhs_planilha.json
+dados_infoOpsClock.json
+LH_busca_especifica.json
+lhs_planilha.json
+dados_outbound_capacity.json
