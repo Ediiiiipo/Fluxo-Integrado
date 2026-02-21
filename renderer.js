@@ -3345,11 +3345,12 @@ function calcularStatusLH(dadosPlanilhaLH, qtdPedidos = null, estatisticas = nul
         console.log(`   💾 [CACHE SPX HIT] ✅✅✅ Usando validação SPX PERMANENTE: ${lhTrip} → ${validacaoSPX.statusCodigo}`);
         return {
             codigo: validacaoSPX.statusCodigo,
-            texto: validacaoSPX.status,
-            classe: `status-${validacaoSPX.statusCodigo.toLowerCase()}`,
-            icone: validacaoSPX.statusCodigo === 'P0' ? '✅' : '🚚',
+            texto: validacaoSPX.status,  // Texto SEM ícone (já foi removido ao salvar)
+            classe: validacaoSPX.classe || `status-${validacaoSPX.statusCodigo.toLowerCase()}`,  // Classe do cache
+            icone: validacaoSPX.icone || (validacaoSPX.statusCodigo === 'P0' ? '✅' : '🚚'),  // Ícone do cache
             isBloqueada: false, // Nunca bloqueia se veio do SPX
-            _spxValidado: true
+            _spxValidado: true,
+            _spxChegadaReal: validacaoSPX.chegadaReal // ← NOVO! Horário real do SPX
         };
     } else {
         if (lhTrip === 'N/A') {
@@ -4237,8 +4238,15 @@ function renderizarTabelaPlanejamento() {
                     valor = '-';
                 }
             } else if (col === 'previsao_data' || col === 'previsao_hora') {
-                // Já está no formato correto
-                valor = valor || '-';
+                // Se foi validado pelo SPX e tem horário real, usar esse horário
+                if (col === 'previsao_hora' && statusLH && statusLH._spxValidado && statusLH._spxChegadaReal) {
+                    const dataChegada = new Date(statusLH._spxChegadaReal);
+                    const hora = dataChegada.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit', second: '2-digit'});
+                    valor = `<span style="color: #10b981; font-weight: bold;">✅ ${hora}</span>`;
+                } else {
+                    // Já está no formato correto
+                    valor = valor || '-';
+                }
             } else if (col.includes('eta') || col.includes('date') || col.includes('previsao') || col.includes('datetime')) {
                 valor = formatarData(valor);
             } else {
@@ -8031,9 +8039,14 @@ function processarResultadosSPXComCSV(resultados) {
                     
                     if (deveAtualizar && novoStatusFront) {
                         // IMPORTANTE: Salvar validação SPX no cache ANTES de atualizar visual
+                        // REMOVER ícone do texto para evitar duplicação na renderização
+                        const textoSemIcone = novoStatusFront.texto.replace(/^[✅🚚⚠️❌]\s*/, '');
+                        
                         cacheSPX.set(lhId, {
-                            status: novoStatusFront.texto,
+                            status: textoSemIcone,  // Texto SEM ícone
                             statusCodigo: novoStatusFront.codigo,
+                            classe: novoStatusFront.classe,  // ← NOVO! Salvar classe também
+                            icone: novoStatusFront.icone,    // ← NOVO! Salvar ícone separado
                             statusSPX: statusSPX,
                             chegadaReal: chegadaReal ? chegadaReal.toISOString() : null,
                             timestamp: new Date().toISOString()
