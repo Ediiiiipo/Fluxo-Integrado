@@ -264,6 +264,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ✅ VERIFICAR SE USUÁRIO JÁ FEZ LOGIN
     verificarLoginUsuario();
+    
+    // 🆕 VERIFICAR SE HÁ NOVA VERSÃO DISPONÍVEL
+    setTimeout(() => {
+        verificarEMostrarAtualizacao();
+    }, 2000); // Aguarda 2s após carregar para não interferir com outros modais
 
     // Carregar stations
     carregarStations();

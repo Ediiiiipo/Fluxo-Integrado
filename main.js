@@ -1432,3 +1432,75 @@ ipcMain.handle('abrir-arquivo', async (event, filePath) => {
         return { success: false, error: error.message };
     }
 });
+
+// ============================================
+// IPC HANDLER - VERIFICAÇÃO DE VERSÃO
+// ============================================
+
+ipcMain.handle('verificar-versao-sheets', async () => {
+  try {
+    console.log('🔍 Verificando versão no Google Sheets...');
+    
+    const { google } = require('googleapis');
+    const credenciaisPath = path.join(__dirname, 'credenciais.json');
+    
+    // Verificar se credenciais existem
+    if (!await fs.pathExists(credenciaisPath)) {
+      throw new Error('Arquivo credenciais.json não encontrado');
+    }
+    
+    // Carregar credenciais
+    const credenciais = await fs.readJson(credenciaisPath);
+    const auth = new google.auth.GoogleAuth({
+      credentials: credenciais,
+      scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly']
+    });
+    
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    // ID da planilha de controle de versão
+    const SPREADSHEET_ID = '1oKhwpY3yWpcb0w6CYqvAoTT2Ss689bwfPw7U6l2jKNo';
+    const SHEET_NAME = 'Sheet3';
+    const RANGE = `${SHEET_NAME}!A2:D2`; // Linha 2: versão aplicação, versão atual, pop-up, link
+    
+    // Buscar dados da planilha
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: RANGE
+    });
+    
+    const valores = response.data.values;
+    
+    if (!valores || valores.length === 0) {
+      throw new Error('Nenhum dado de versão encontrado na planilha');
+    }
+    
+    const [versaoAplicacao, versaoAtual, popupTexto, linkDownload] = valores[0];
+    
+    // Versão local (do package.json)
+    const versaoLocal = packageJson.version;
+    
+    // Converter pop-up para boolean (qualquer texto não vazio = true)
+    const mostrarPopup = popupTexto && popupTexto.trim().length > 0;
+    
+    console.log(`📌 Versão local: ${versaoLocal}`);
+    console.log(`📌 Versão remota: ${versaoAtual}`);
+    console.log(`📌 Mostrar popup: ${mostrarPopup}`);
+    console.log(`📌 Link download: ${linkDownload}`);
+    
+    return {
+      success: true,
+      versaoLocal,
+      versaoRemota: versaoAtual,
+      mostrarPopup,
+      linkDownload
+    };
+    
+  } catch (error) {
+    console.error('❌ Erro ao verificar versão:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+});

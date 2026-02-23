@@ -1371,6 +1371,7 @@
     </script>
 
     <script src="user-tracking.js"></script>
+    <script src="version-checker.js"></script>
     <script src="renderer.js"></script>
 
     <!-- MODAL CAP MANUAL -->
@@ -2127,5 +2128,66 @@ Agradecimento especial a <strong>Paulo Fernandes</strong> pela participação co
 </div>
 
 <!-- <link rel="stylesheet" href="license-styles.css"> -->
+
+<!-- ============================================
+     MODAL DE ATUALIZAÇÃO DE VERSÃO
+     ============================================ -->
+<div class="modal-overlay" id="modalAtualizacao" style="display: none; z-index: 10000;">
+  <div class="modal-container" style="max-width: 550px;">
+    <div class="modal-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+      <h2 style="color: white;">
+        <span style="color: white;">🆕</span> 
+        <span style="color: white;">Nova Versão Disponível!</span>
+      </h2>
+    </div>
+    
+    <div class="modal-body" style="padding: 30px;">
+      <div style="text-align: center; margin-bottom: 25px;">
+        <div style="font-size: 48px; margin-bottom: 10px;">🎉</div>
+        <p style="font-size: 16px; color: #666; margin-bottom: 20px;">
+          Uma nova versão do <strong>Planejamento Fluxo Integrado</strong> está disponível!
+        </p>
+      </div>
+      
+      <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-around; text-align: center;">
+          <div>
+            <p style="font-size: 12px; color: #999; margin-bottom: 5px;">Versão Atual</p>
+            <p style="font-size: 24px; font-weight: bold; color: #dc3545;" id="versaoAtualTexto">1.0.0</p>
+          </div>
+          <div style="display: flex; align-items: center;">
+            <span style="font-size: 32px; color: #28a745;">→</span>
+          </div>
+          <div>
+            <p style="font-size: 12px; color: #999; margin-bottom: 5px;">Nova Versão</p>
+            <p style="font-size: 24px; font-weight: bold; color: #28a745;" id="versaoNovaTexto">2.0.0</p>
+          </div>
+        </div>
+      </div>
+      
+      <div style="background: #e7f3ff; border-left: 4px solid #2196F3; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+        <p style="margin: 0; color: #1976D2; font-size: 14px;">
+          <strong>ℹ️ Importante:</strong> Recomendamos que você atualize para ter acesso às últimas melhorias e correções.
+        </p>
+      </div>
+    </div>
+    
+    <div class="modal-footer" style="display: flex; gap: 10px;">
+      <button 
+        class="btn btn-secondary" 
+        onclick="fecharModalAtualizacao()" 
+        style="flex: 1; padding: 12px; font-size: 14px;">
+        ⏰ Lembrar Depois
+      </button>
+      <button 
+        class="btn btn-primary" 
+        id="btnBaixarAtualizacao"
+        style="flex: 2; padding: 12px; font-size: 16px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none;">
+        🚀 Baixar Atualização
+      </button>
+    </div>
+  </div>
+</div>
+
   </body>
 </html>
