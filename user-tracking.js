@@ -2,6 +2,9 @@
 // USER TRACKING - Sistema de Login e Logs
 // ============================================
 
+// Importar versão do package.json
+const packageJson = require('./package.json');
+
 // ===== FUN\u00c7\u00d5ES DE LOGIN =====
 
 // Verificar se usu\u00e1rio j\u00e1 fez login
@@ -106,7 +109,8 @@ async function enviarLogPlanejamento(dadosRelatorio) {
             pedidosTotais: dadosRelatorio.pedidosTotais,
             pedidosPlanejados: dadosRelatorio.pedidosPlanejados,
             quantidadeLHs: dadosRelatorio.quantidadeLHs,
-            backlog: dadosRelatorio.backlog
+            backlog: dadosRelatorio.backlog,
+            versao: packageJson.version
         };
         
         console.log('\ud83d\udcca Dados do log:', logData);

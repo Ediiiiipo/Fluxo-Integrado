@@ -1054,14 +1054,15 @@ ipcMain.handle('salvar-log-planejamento', async (event, logData) => {
         logData.pedidosTotais,            // Coluna G: PEDIDOS TOTAIS
         logData.pedidosPlanejados,        // Coluna H: PEDIDOS PLANEJADOS
         logData.quantidadeLHs,            // Coluna I: QTD LHs
-        logData.backlog                   // Coluna J: BACKLOG
+        logData.backlog,                  // Coluna J: BACKLOG
+        logData.versao                    // Coluna K: VERSÃO
       ]
     ];
     
     // Adicionar linha no Google Sheets
     await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${SHEET_NAME}!A:J`,
+      range: `${SHEET_NAME}!A:K`,
       valueInputOption: 'RAW',
       resource: {
         values: valores
