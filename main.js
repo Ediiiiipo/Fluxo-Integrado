@@ -1018,6 +1018,10 @@ ipcMain.handle('salvar-log-planejamento', async (event, logData) => {
   try {
     console.log('📝 Salvando log de planejamento no Google Sheets...');
     
+    // Adicionar versão do package.json ao logData
+    logData.versao = packageJson.version;
+    console.log(`📌 Versão capturada: ${logData.versao}`);
+    
     const { google } = require('googleapis');
     const credenciaisPath = path.join(__dirname, 'credenciais.json');
     
