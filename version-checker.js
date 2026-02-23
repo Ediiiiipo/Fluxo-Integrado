@@ -89,7 +89,7 @@ async function verificarNovaVersao() {
     }
 }
 
-// Mostrar modal de atualização
+// Mostrar modal de atualização (MODO BLOQUEANTE)
 function mostrarModalAtualizacao(dadosVersao) {
     const modal = document.getElementById('modalAtualizacao');
     if (!modal) {
@@ -110,45 +110,89 @@ function mostrarModalAtualizacao(dadosVersao) {
         btnBaixar.onclick = () => {
             // Abrir link de download no navegador padrão
             require('electron').shell.openExternal(dadosVersao.linkDownload);
-            fecharModalAtualizacao();
+            // NÃO fecha o modal - usuário deve atualizar e reiniciar
+            console.log('🚀 Link de download aberto. Aguardando atualização...');
         };
     }
     
     // Mostrar modal
     modal.style.display = 'flex';
     
-    console.log('✅ Modal de atualização exibido');
+    // 🔒 BLOQUEAR FECHAMENTO DO MODAL
+    bloquearFechamentoModal(modal);
+    
+    // 🔒 BLOQUEAR TODA A APLICAÇÃO
+    bloquearAplicacao();
+    
+    console.log('🔒 Modal de atualização OBRIGATÓRIA exibido - Aplicação bloqueada');
 }
 
-// Fechar modal de atualização
+// Fechar modal de atualização (DESABILITADO EM MODO OBRIGATÓRIO)
 function fecharModalAtualizacao() {
+    // NÃO FAZ NADA - Modal não pode ser fechado em modo obrigatório
+    console.warn('⚠️ Tentativa de fechar modal bloqueada - Atualização obrigatória');
+}
+
+// Bloquear fechamento do modal (ESC, clique fora, etc.)
+function bloquearFechamentoModal(modal) {
+    // Bloquear ESC
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
+            console.warn('⚠️ ESC bloqueado - Atualização obrigatória');
+        }
+    }, true);
+    
+    // Bloquear clique fora do modal
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.warn('⚠️ Clique fora do modal bloqueado - Atualização obrigatória');
+        }
+    }, true);
+    
+    console.log('🔒 Fechamento do modal bloqueado');
+}
+
+// Bloquear toda a aplicação (overlay sobre tudo)
+function bloquearAplicacao() {
+    // Criar overlay bloqueante sobre toda a aplicação
+    const overlay = document.createElement('div');
+    overlay.id = 'overlayBloqueioAtualizacao';
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(0, 0, 0, 0.95);
+        z-index: 9999;
+        pointer-events: all;
+        cursor: not-allowed;
+    `;
+    
+    // Bloquear todos os eventos
+    overlay.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+    }, true);
+    
+    overlay.addEventListener('keydown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+    }, true);
+    
+    document.body.appendChild(overlay);
+    
+    // Garantir que o modal fique acima do overlay
     const modal = document.getElementById('modalAtualizacao');
     if (modal) {
-        modal.style.display = 'none';
+        modal.style.zIndex = '10000';
     }
-}
-
-// Mostrar badge de nova versão no header
-function mostrarBadgeNovaVersao() {
-    const header = document.querySelector('.app-header');
-    if (!header) return;
     
-    // Verificar se badge já existe
-    if (document.getElementById('badgeNovaVersao')) return;
-    
-    // Criar badge
-    const badge = document.createElement('div');
-    badge.id = 'badgeNovaVersao';
-    badge.className = 'badge-nova-versao';
-    badge.innerHTML = '🆕 Nova versão disponível';
-    badge.onclick = () => {
-        // Reabrir modal ao clicar no badge
-        verificarEMostrarAtualizacao();
-    };
-    
-    header.appendChild(badge);
-    
-    console.log('✅ Badge de nova versão adicionado ao header');
+    console.log('🔒 Aplicação bloqueada - Overlay ativado');
 }
 
 // Função principal: verificar e mostrar atualização se necessário
