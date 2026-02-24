@@ -264,11 +264,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ✅ VERIFICAR SE USUÁRIO JÁ FEZ LOGIN
     verificarLoginUsuario();
-    
-    // 🆕 VERIFICAR SE HÁ NOVA VERSÃO DISPONÍVEL
-    setTimeout(() => {
-        verificarEMostrarAtualizacao();
-    }, 2000); // Aguarda 2s após carregar para não interferir com outros modais
 
     // Carregar stations
     carregarStations();
@@ -7830,6 +7825,12 @@ function obterLHsVisiveis() {
  */
 function processarResultadosSPXComCSV(resultados) {
     console.log('📊 [SPX] Processando resultados do CSV e validando status...');
+    console.log(`📊 [SPX] Total de resultados recebidos: ${resultados.length}`);
+    
+    let totalProcessados = 0;
+    let totalAtualizados = 0;
+    let totalIgnorados = 0;
+    let totalLinhaNaoEncontrada = 0;
     
     // Encontrar tabela ativa
     let tbody = null;
@@ -7871,14 +7872,26 @@ function processarResultadosSPXComCSV(resultados) {
         const lhId = resultado.lh_id;
         const dados = resultado.dados;
         
-        if (!dados) return;
+        totalProcessados++;
+        console.log(`\n🔄 [SPX ${totalProcessados}/${resultados.length}] Processando LH: ${lhId}`);
+        
+        if (!dados) {
+            console.log(`   ⚠️ Dados vazios, pulando...`);
+            totalIgnorados++;
+            return;
+        }
         
         const linhas = tbody.querySelectorAll('tr');
+        let linhaEncontrada = false;
+        
         linhas.forEach(linha => {
             // Procurar pela célula com classe 'lh-trip-cell'
             const celulaLH = linha.querySelector('td.lh-trip-cell');
             
             if (celulaLH && celulaLH.textContent.trim() === lhId) {
+                linhaEncontrada = true;
+                console.log(`   ✅ Linha encontrada na tabela`);
+                
                 // Extrair informações do SPX
                 const stations = dados.trip_station || [];
                 const destino = stations[stations.length - 1] || {};
@@ -7924,7 +7937,7 @@ function processarResultadosSPXComCSV(resultados) {
                 // Começar da segunda coluna em diante
                 for (let i = 1; i < todasColunas.length; i++) {
                     const celula = todasColunas[i];
-                    const badge = celula.querySelector('.badge, .status-badge');
+                    const badge = celula.querySelector('.badge, .status-badge, .badge-status-lh');
                     const texto = celula.textContent.trim();
                     
                     // IGNORAR se for coluna TIPO (Normal, Backlog)
@@ -7937,32 +7950,61 @@ function processarResultadosSPXComCSV(resultados) {
                         continue;
                     }
                     
-                    // Verificar se contém STATUS conhecidos (não TIPO)
-                    const isStatusColumn = 
+                    // IGNORAR se for coluna de TOs (pedidos_tos)
+                    if (celula.classList.contains('pedidos-tos-cell')) {
+                        continue;
+                    }
+                    
+                    // Verificar se é coluna de STATUS por:
+                    // 1. Badges com classes de status
+                    // 2. Ícones de status (✅, 🚚, ⚠️, ❌)  
+                    // 3. Textos conhecidos de status
+                    const hasStatusBadge = badge && (
+                        badge.classList.contains('status-p0') ||
+                        badge.classList.contains('status-p0-desc') ||
+                        badge.classList.contains('status-p1') ||
+                        badge.classList.contains('status-p2') ||
+                        badge.classList.contains('status-p3') ||
+                        badge.classList.contains('status-p0i') ||
+                        badge.classList.contains('badge-status-lh')
+                    );
+                    
+                    const hasStatusIcon = 
+                        texto.includes('✅') ||
+                        texto.includes('🚚') ||
+                        texto.includes('⚠️') ||
+                        texto.includes('❌');
+                    
+                    const hasStatusText =
                         texto.includes('No Piso') ||
                         texto.includes('Aguard') ||
                         texto.includes('Descarregamento') ||
                         texto.includes('Sinalizar') ||
                         texto.includes('Inventário') ||
-                        texto.includes('Em transito') ||
-                        texto.includes('Em trânsito') ||
+                        texto.includes('Trânsito') ||  // ← CORRIGIDO! Procura "Trânsito" em qualquer lugar
+                        texto.includes('Transito') ||  // ← CORRIGIDO! Também sem acento
                         texto.includes('fora do prazo') ||
                         texto.includes('dentro do prazo') ||
-                        texto.includes('No Hub') ||
-                        (badge && (
-                            badge.classList.contains('status-p0') ||
-                            badge.classList.contains('status-p0-desc') ||
-                            badge.classList.contains('status-p1') ||
-                            badge.classList.contains('status-p2') ||
-                            badge.classList.contains('status-p3') ||
-                            badge.classList.contains('status-p0i')
-                        ));
+                        texto.includes('No Hub');
+                    
+                    const isStatusColumn = hasStatusBadge || hasStatusIcon || hasStatusText;
                     
                     if (isStatusColumn) {
                         celulaStatus = celula;
                         indexStatus = i;
                         console.log(`   🎯 Coluna STATUS encontrada no índice ${i}: "${texto}"`);
                         break;
+                    }
+                }
+                
+                if (!celulaStatus) {
+                    console.log(`   ⚠️ COLUNA STATUS NÃO ENCONTRADA! Debugando todas as colunas:`);
+                    for (let i = 0; i < todasColunas.length; i++) {
+                        const celula = todasColunas[i];
+                        const badge = celula.querySelector('.badge, .status-badge, .badge-status-lh');
+                        const texto = celula.textContent.trim();
+                        const classes = badge ? Array.from(badge.classList).join(', ') : 'sem badge';
+                        console.log(`      Col ${i}: "${texto.substring(0, 50)}" | Badge: ${classes}`);
                     }
                 }
                 
@@ -8118,6 +8160,7 @@ function processarResultadosSPXComCSV(resultados) {
                         }
                         
                         statusAtualizados++;
+                        totalAtualizados++;
                         console.log(`   ✅ Status atualizado: ${lhId} → ${novoStatusFront.texto} (SPX: ${statusSPX})`);
                     }
                     
@@ -8150,27 +8193,32 @@ function processarResultadosSPXComCSV(resultados) {
                 }
             }
         });
+        
+        if (!linhaEncontrada) {
+            console.log(`   ❌ Linha NÃO encontrada na tabela para LH: ${lhId}`);
+            totalLinhaNaoEncontrada++;
+        }
     });
     
-    console.log(`✅ [SPX] Sincronização concluída:`);
+    console.log(`\n✅ [SPX] Sincronização concluída:`);
+    console.log(`   📊 ${totalProcessados} LHs processadas`);
+    console.log(`   ✅ ${totalAtualizados} status atualizados`);
+    console.log(`   ❌ ${totalIgnorados} LHs ignoradas (sem dados)`);
+    console.log(`   ⚠️ ${totalLinhaNaoEncontrada} LHs não encontradas na tabela`);
     console.log(`   📊 ${atualizadas} tooltips adicionados`);
-    console.log(`   🔄 ${statusAtualizados} status atualizados`);
+    console.log(`   🔄 ${statusAtualizados} status atualizados (old counter)`);
     console.log(`   🕐 ${horariosAtualizados} horários de chegada atualizados`);
     
     // IMPORTANTE: Re-renderizar sugestão de planejamento se houve atualizações
     if (statusAtualizados > 0) {
-        console.log(`   🔄 Re-renderizando sugestão de planejamento...`);
+        console.log(`   🔄 Re-renderizando tabela de planejamento...`);
         
         // Re-calcular e atualizar a sugestão
         try {
-            // Verificar qual ciclo está selecionado
-            const cicloAtivo = document.querySelector('.ciclo-card.ativo');
-            const cicloSelecionado = cicloAtivo ? cicloAtivo.dataset.ciclo : 'Todos';
+            // Re-renderizar a tabela
+            renderizarTabelaPlanejamento();
             
-            // Re-renderizar a visualização com os novos dados
-            renderizarVisualizacao(cicloSelecionado);
-            
-            console.log(`   ✅ Sugestão re-renderizada com dados atualizados!`);
+            console.log(`   ✅ Tabela re-renderizada com dados atualizados!`);
         } catch (error) {
             console.error(`   ❌ Erro ao re-renderizar:`, error);
         }
