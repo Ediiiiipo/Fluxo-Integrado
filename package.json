@@ -1,6 +1,6 @@
 {
   "name": "shopee-manager",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Gerenciador de Pedidos Shopee - Planejamento Integrado (Ultra-Otimizado)",
   "main": "main.js",
   "scripts": {
