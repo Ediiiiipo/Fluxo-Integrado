@@ -1481,6 +1481,7 @@ function sugerirPlanejamentoAutomatico() {
                 dentroLimite: tempoCorte.dentroLimite,
                 statusLH,
                 isBacklogPiso: statusLH.codigo === 'P0B',
+                isFull: verificarSeLHFull(dadosPlanilhaLH), // ← NOVO! Verifica se LH é FULL
                 dataPrevisao
             };
         });
@@ -1549,16 +1550,20 @@ function sugerirPlanejamentoAutomatico() {
                 continue; // Pular esta LH
             }
             
-            // Verificar se cabe no CAP
-            if (totalSelecionado + lhInfo.qtdPedidos <= capCiclo) {
-                // LH cabe perfeitamente no CAP
+            // 🔒 PRIORIDADE ABSOLUTA: LHs FULL sempre são incluídas (ignoram CAP)
+            // LHs normais só entram se couberem no CAP
+            const cabNoCAP = totalSelecionado + lhInfo.qtdPedidos <= capCiclo;
+            
+            if (lhInfo.isFull || cabNoCAP) {
+                // LH FULL (sempre entra) OU LH normal que cabe no CAP
                 lhsSelecionadasPlan.add(lhInfo.lhTrip);
                 lhsSugeridas.push(lhInfo);
                 totalSelecionado += lhInfo.qtdPedidos;
                 
                 if (lhInfo.isBacklogPiso) backlogsPisoSelecionados++;
                 
-                console.log(`✅ LH ${lhInfo.lhTrip} INCLUÍDA: ${lhInfo.qtdPedidos} pedidos (corte em ${lhInfo.minutosCorte || '?'} min)`);
+                const motivoInclusao = lhInfo.isFull ? '⚡ FULL - PRIORIDADE ABSOLUTA' : 'cabe no CAP';
+                console.log(`✅ LH ${lhInfo.lhTrip} INCLUÍDA (${motivoInclusao}): ${lhInfo.qtdPedidos} pedidos (corte em ${lhInfo.minutosCorte || '?'} min)`);
             } else if (totalSelecionado < capCiclo) {
                 // 🎯 FIFO: Próxima LH que não cabe no CAP
                 // Não incluir LH completa, mas marcar para sugestão de TOs
@@ -3317,6 +3322,25 @@ function parsearDataHora(str) {
     } catch (e) {
         return null;
     }
+}
+
+// Função para verificar se uma LH é FULL
+function verificarSeLHFull(dadosPlanilhaLH) {
+    if (!dadosPlanilhaLH) return false;
+    
+    // Verificar se origin começa com FBS_
+    const valorOrigin = dadosPlanilhaLH?.origin || '';
+    const isFBS = valorOrigin && typeof valorOrigin === 'string' && 
+                  valorOrigin.toUpperCase().startsWith('FBS_');
+    
+    // Verificar flags de FULL
+    const isFull = isFBS || 
+                   dadosPlanilhaLH?.is_full === 'Full' || 
+                   dadosPlanilhaLH?.is_full === 'Sim' ||
+                   dadosPlanilhaLH?.is_full_truck === 'Full' || 
+                   dadosPlanilhaLH?.tipo_carga === 'Full';
+    
+    return isFull;
 }
 
 // Função para calcular o status da LH baseado nas colunas da planilha
