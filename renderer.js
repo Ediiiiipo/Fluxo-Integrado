@@ -1436,6 +1436,7 @@ function sugerirPlanejamentoAutomatico() {
     const backlogSugerido = [];
     let lhsBloqueadas = 0;
     let lhsForaDoCorte = 0;
+    let lhsComInfo = []; // ← MOVIDO PARA ESCOPO EXTERNO (corrige erro de referência)
     
     // ===== PASSO 1: BACKLOG (pedidos com status LMHub_Received ou Return_LMHub_Received) =====
     // Isso inclui pedidos COM ou SEM LH que tenham esse status
@@ -1460,7 +1461,7 @@ function sugerirPlanejamentoAutomatico() {
         const lhsDoSPX = Object.keys(lhTripsPlanejáveis).filter(lh => lh && lh !== '(vazio)' && lh.trim() !== '');
         
         // Montar array com info de cada LH incluindo status e data
-        const lhsComInfo = lhsDoSPX.map(lhTrip => {
+        lhsComInfo = lhsDoSPX.map(lhTrip => {
             const qtdPedidos = lhTripsPlanejáveis[lhTrip]?.length || 0;
             // ✅ USAR FUNÇÃO DE FILTRO POR STATION
             const dadosPlanilhaLH = buscarDadosPlanilhaPorStation(lhTrip);
