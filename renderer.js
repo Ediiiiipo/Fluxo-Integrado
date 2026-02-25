@@ -1408,7 +1408,8 @@ function sugerirPlanejamentoAutomatico() {
         return;
     }
     
-    console.log('🎯 Iniciando sugestão automática para ciclo ' + cicloParaUsar);
+    console.log('🔥🔥🔥 VERSÃO COM PRIORIDADE FULL ATIVA! 🔥🔥🔥');
+    console.log("🎯 Iniciando sugestão automática para ciclo " + cicloParaUsar);
     console.log('📊 Usando: ' + tipoCAP);
     console.log('📊 CAP do ciclo: ' + capCiclo.toLocaleString('pt-BR') + ' pedidos');
     
