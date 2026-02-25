@@ -1473,7 +1473,9 @@ function sugerirPlanejamentoAutomatico() {
             const previsaoFinal = dadosPlanilhaLH?.previsao_final || '';
             const dataPrevisao = extrairDataParaOrdenacao(previsaoFinal);
             
-            return {
+            const isFull = verificarSeLHFull(dadosPlanilhaLH); // ← NOVO! Verifica se LH é FULL
+            
+            const lhInfo = {
                 lhTrip,
                 qtdPedidos,
                 tempoCorte,
@@ -1481,9 +1483,13 @@ function sugerirPlanejamentoAutomatico() {
                 dentroLimite: tempoCorte.dentroLimite,
                 statusLH,
                 isBacklogPiso: statusLH.codigo === 'P0B',
-                isFull: verificarSeLHFull(dadosPlanilhaLH), // ← NOVO! Verifica se LH é FULL
+                isFull,
                 dataPrevisao
             };
+            
+            console.log(`📦 lhInfo criado - ${lhTrip}: isFull=${isFull}`);
+            
+            return lhInfo;
         });
         
         // Ordenar por: Data → Hora → Status (mais antigo primeiro - FIFO)
@@ -3326,7 +3332,12 @@ function parsearDataHora(str) {
 
 // Função para verificar se uma LH é FULL
 function verificarSeLHFull(dadosPlanilhaLH) {
-    if (!dadosPlanilhaLH) return false;
+    if (!dadosPlanilhaLH) {
+        console.log('⚠️ verificarSeLHFull: dadosPlanilhaLH é null/undefined');
+        return false;
+    }
+    
+    const lhTrip = dadosPlanilhaLH?.trip_number || dadosPlanilhaLH?.lh_trip || 'N/A';
     
     // Verificar se origin começa com FBS_
     const valorOrigin = dadosPlanilhaLH?.origin || '';
@@ -3339,6 +3350,14 @@ function verificarSeLHFull(dadosPlanilhaLH) {
                    dadosPlanilhaLH?.is_full === 'Sim' ||
                    dadosPlanilhaLH?.is_full_truck === 'Full' || 
                    dadosPlanilhaLH?.tipo_carga === 'Full';
+    
+    // DEBUG: Log detalhado
+    console.log(`🔍 verificarSeLHFull - LH: ${lhTrip}`);
+    console.log(`   origin: "${valorOrigin}" | isFBS: ${isFBS}`);
+    console.log(`   is_full: "${dadosPlanilhaLH?.is_full}"`);
+    console.log(`   is_full_truck: "${dadosPlanilhaLH?.is_full_truck}"`);
+    console.log(`   tipo_carga: "${dadosPlanilhaLH?.tipo_carga}"`);
+    console.log(`   ➡️ Resultado: ${isFull ? '⚡ FULL' : 'Normal'}`);
     
     return isFull;
 }
