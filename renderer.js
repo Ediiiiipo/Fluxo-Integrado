@@ -1409,6 +1409,7 @@ function sugerirPlanejamentoAutomatico() {
     }
     
     console.log('🔥🔥🔥 VERSÃO COM PRIORIDADE FULL ATIVA! 🔥🔥🔥');
+    console.log('📌 BUILD: 2026-02-25 20:30 - VERSÃO FULL PRIORITY v2.0');
     console.log("🎯 Iniciando sugestão automática para ciclo " + cicloParaUsar);
     console.log('📊 Usando: ' + tipoCAP);
     console.log('📊 CAP do ciclo: ' + capCiclo.toLocaleString('pt-BR') + ' pedidos');
@@ -1476,6 +1477,7 @@ function sugerirPlanejamentoAutomatico() {
             const dataPrevisao = extrairDataParaOrdenacao(previsaoFinal);
             
             const isFull = verificarSeLHFull(dadosPlanilhaLH); // ← NOVO! Verifica se LH é FULL
+            console.log(`🔥 VERIFICANDO FULL: ${lhTrip} → isFull = ${isFull}`);
             
             const lhInfo = {
                 lhTrip,
@@ -1561,6 +1563,8 @@ function sugerirPlanejamentoAutomatico() {
             // 🔒 PRIORIDADE ABSOLUTA: LHs FULL sempre são incluídas (ignoram CAP)
             // LHs normais só entram se couberem no CAP
             const cabNoCAP = totalSelecionado + lhInfo.qtdPedidos <= capCiclo;
+            
+            console.log(`🔍 VERIFICANDO INCLUSÃO: ${lhInfo.lhTrip} | isFull=${lhInfo.isFull} | cabNoCAP=${cabNoCAP}`);
             
             if (lhInfo.isFull || cabNoCAP) {
                 // LH FULL (sempre entra) OU LH normal que cabe no CAP
