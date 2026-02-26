@@ -1544,6 +1544,18 @@ function sugerirPlanejamentoAutomatico() {
         let backlogsPisoSelecionados = 0;
         
         for (const lhInfo of lhsComInfo) {
+            // 🔥 PRIORIDADE ABSOLUTA: LHs FULL ignoram TODAS as validações (status, corte, etc)
+            if (lhInfo.isFull) {
+                lhsSelecionadasPlan.add(lhInfo.lhTrip);
+                lhsSugeridas.push(lhInfo);
+                totalSelecionado += lhInfo.qtdPedidos;
+                
+                if (lhInfo.isBacklogPiso) backlogsPisoSelecionados++;
+                
+                console.log(`✅ LH ${lhInfo.lhTrip} INCLUÍDA (⚡ FULL - PRIORIDADE ABSOLUTA): ${lhInfo.qtdPedidos} pedidos (status: ${lhInfo.statusLH?.codigo}, corte: ${lhInfo.minutosCorte || '?'} min)`);
+                continue; // Próxima LH
+            }
+            
             // 🔒 VALIDAÇÃO DE STATUS: Ignorar LHs bloqueadas (status P3 - fora do prazo)
             if (lhInfo.statusLH?.codigo === 'P3') {
                 lhsBloqueadas++;
@@ -1560,22 +1572,20 @@ function sugerirPlanejamentoAutomatico() {
                 continue; // Pular esta LH
             }
             
-            // 🔒 PRIORIDADE ABSOLUTA: LHs FULL sempre são incluídas (ignoram CAP)
-            // LHs normais só entram se couberem no CAP
+            // 🔒 LHs normais só entram se couberem no CAP
             const cabNoCAP = totalSelecionado + lhInfo.qtdPedidos <= capCiclo;
             
-            console.log(`🔍 VERIFICANDO INCLUSÃO: ${lhInfo.lhTrip} | isFull=${lhInfo.isFull} | cabNoCAP=${cabNoCAP}`);
+            console.log(`🔍 VERIFICANDO INCLUSÃO: ${lhInfo.lhTrip} | cabNoCAP=${cabNoCAP}`);
             
-            if (lhInfo.isFull || cabNoCAP) {
-                // LH FULL (sempre entra) OU LH normal que cabe no CAP
+            if (cabNoCAP) {
+                // LH normal que cabe no CAP
                 lhsSelecionadasPlan.add(lhInfo.lhTrip);
                 lhsSugeridas.push(lhInfo);
                 totalSelecionado += lhInfo.qtdPedidos;
                 
                 if (lhInfo.isBacklogPiso) backlogsPisoSelecionados++;
                 
-                const motivoInclusao = lhInfo.isFull ? '⚡ FULL - PRIORIDADE ABSOLUTA' : 'cabe no CAP';
-                console.log(`✅ LH ${lhInfo.lhTrip} INCLUÍDA (${motivoInclusao}): ${lhInfo.qtdPedidos} pedidos (corte em ${lhInfo.minutosCorte || '?'} min)`);
+                console.log(`✅ LH ${lhInfo.lhTrip} INCLUÍDA (cabe no CAP): ${lhInfo.qtdPedidos} pedidos (corte em ${lhInfo.minutosCorte || '?'} min)`);
             } else if (totalSelecionado < capCiclo) {
                 // 🎯 FIFO: Próxima LH que não cabe no CAP
                 // Não incluir LH completa, mas marcar para sugestão de TOs
