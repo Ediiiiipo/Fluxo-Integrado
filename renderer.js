@@ -1634,6 +1634,11 @@ function sugerirPlanejamentoAutomatico() {
         lhsBloqueadas: lhsBloqueadas || 0
     });
     
+    // 🧹 LIMPAR CAP MANUAL após gerar planejamento
+    capsManual = {};
+    localStorage.removeItem('capsManual');
+    console.log('🧹 CAP Manual limpo após gerar planejamento');
+    
     // Atualizar interface
     renderizarTabelaPlanejamento();
     renderizarBacklog();
@@ -5845,16 +5850,9 @@ window.sugerirTOsAutomatico = sugerirTOsAutomatico;
 // ======================= FUNÇÕES CAP MANUAL =======================
 
 function carregarCapsManual() {
-    const saved = localStorage.getItem('capsManual');
-    if (saved) {
-        try {
-            capsManual = JSON.parse(saved);
-            console.log('📊 CAPs Manual carregados:', capsManual);
-        } catch (e) {
-            console.error('Erro ao carregar CAPs manual:', e);
-            capsManual = {};
-        }
-    }
+    // SEMPRE INICIAR VAZIO - não carregar do localStorage
+    capsManual = {};
+    console.log('🔄 CAPs Manual inicializado vazio (sempre limpo ao abrir/recarregar)');
 }
 
 function salvarCapsManual() {
