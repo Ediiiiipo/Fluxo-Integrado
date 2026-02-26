@@ -3,6 +3,9 @@
 // Sistema de Planejamento Hub e Backlog
 // ============================================
 
+// 🔥 ALERT DE VERSÃO - Para confirmar que o arquivo correto está sendo carregado
+alert('🔥 VERSÃO FULL PRIORITY v2.0 - BUILD 2026-02-25 20:30 🔥');
+
 const {
     ipcRenderer
 } = require('electron');
