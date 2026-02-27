@@ -292,23 +292,83 @@ class ShopeeDownloader {
         } catch (e) {}
       }
       
-      // Retry automático se for timeout e ainda houver tentativas
-      if (error.message.includes('Timeout') && tentativa < maxTentativas) {
+      // Detectar tipo de erro de conexão
+      const errorMsg = error.message;
+      const isDisconnected = errorMsg.includes('ERR_INTERNET_DISCONNECTED') || errorMsg.includes('net::ERR_NETWORK_CHANGED');
+      const isTimeout = errorMsg.includes('Timeout');
+      const isDNS = errorMsg.includes('ERR_NAME_NOT_RESOLVED');
+      const isRefused = errorMsg.includes('ERR_CONNECTION_REFUSED');
+      
+      // Retry automático (exceto se sem internet)
+      if (!isDisconnected && tentativa < maxTentativas) {
         this.log(`🔄 Tentando novamente... (${tentativa + 1}/${maxTentativas})`, 'info');
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Aguardar 2s antes de tentar novamente
+        await new Promise(resolve => setTimeout(resolve, 3000)); // Aguardar 3s antes de tentar novamente
         return this.verificarSeEstaLogado(headless, tentativa + 1, maxTentativas);
       }
       
-      // Mensagem de erro melhorada
-      if (error.message.includes('Timeout')) {
-        this.log('\n❌ ERRO: Não foi possível acessar a API da Shopee após 3 tentativas.', 'error');
+      // Mensagens específicas por tipo de erro
+      this.log('', 'error');
+      this.log('═'.repeat(70), 'error');
+      
+      if (isDisconnected) {
+        this.log('❌ ERRO: SEM CONEXÃO COM A INTERNET', 'error');
+        this.log('', 'error');
+        this.log('📋 O que aconteceu:', 'info');
+        this.log('   • Sua conexão com a internet foi perdida', 'info');
+        this.log('   • VPN pode ter desconectado durante o processo', 'info');
+        this.log('   • Rede Wi-Fi/Ethernet instável', 'info');
+        this.log('', 'error');
+        this.log('💡 Solução:', 'warning');
+        this.log('   1. Verifique sua conexão com a internet', 'warning');
+        this.log('   2. Reconecte à VPN (se usar)', 'warning');
+        this.log('   3. Tente novamente após estabilizar a conexão', 'warning');
+      } else if (isDNS) {
+        this.log('❌ ERRO: NÃO FOI POSSÍVEL ENCONTRAR O SERVIDOR', 'error');
+        this.log('', 'error');
+        this.log('📋 O que aconteceu:', 'info');
+        this.log('   • Problema de DNS (servidor de nomes)', 'info');
+        this.log('   • Firewall bloqueando acesso ao SPX', 'info');
+        this.log('', 'error');
+        this.log('💡 Solução:', 'warning');
+        this.log('   1. Verifique se consegue acessar spx.shopee.com.br no navegador', 'warning');
+        this.log('   2. Desative temporariamente antivírus/firewall', 'warning');
+        this.log('   3. Tente usar outra rede (4G/5G)', 'warning');
+      } else if (isRefused) {
+        this.log('❌ ERRO: CONEXÃO RECUSADA PELO SERVIDOR', 'error');
+        this.log('', 'error');
+        this.log('📋 O que aconteceu:', 'info');
+        this.log('   • O servidor SPX recusou a conexão', 'info');
+        this.log('   • Pode estar em manutenção', 'info');
+        this.log('', 'error');
+        this.log('💡 Solução:', 'warning');
+        this.log('   1. Aguarde alguns minutos e tente novamente', 'warning');
+        this.log('   2. Verifique se o SPX está acessível no navegador', 'warning');
+      } else if (isTimeout) {
+        this.log('❌ ERRO: TEMPO LIMITE EXCEDIDO (TIMEOUT)', 'error');
+        this.log('', 'error');
+        this.log('📋 O que aconteceu:', 'info');
+        this.log('   • Conexão muito lenta', 'info');
+        this.log('   • Servidor SPX não respondeu a tempo', 'info');
+        this.log('', 'error');
+        this.log('💡 Solução:', 'warning');
+        this.log('   1. Verifique a velocidade da sua internet', 'warning');
+        this.log('   2. Feche outros programas que usam internet', 'warning');
+        this.log('   3. Tente em outro horário (menos congestionado)', 'warning');
+      } else {
+        this.log('❌ ERRO: FALHA AO ACESSAR A API DA SHOPEE', 'error');
+        this.log('', 'error');
         this.log('📋 Possíveis causas:', 'info');
-        this.log('   1. Você não está logado na Shopee (faça login primeiro)', 'info');
-        this.log('   2. Sua conexão está lenta ou instável', 'info');
-        this.log('   3. A API da Shopee está fora do ar ou lenta', 'info');
-        this.log('   4. VPN ou firewall bloqueando o acesso', 'info');
-        this.log('\n💡 Solução: Feche a aplicação e tente novamente em alguns minutos.', 'info');
+        this.log('   1. Você não está logado na Shopee', 'info');
+        this.log('   2. Sessão expirou', 'info');
+        this.log('   3. Problema temporário no servidor', 'info');
+        this.log('', 'error');
+        this.log('💡 Solução:', 'warning');
+        this.log('   1. Feche e abra a ferramenta novamente', 'warning');
+        this.log('   2. Faça login manual (aba Download)', 'warning');
       }
+      
+      this.log('═'.repeat(70), 'error');
+      this.log('', 'error');
       
       return {
         logado: false,
