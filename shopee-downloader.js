@@ -205,8 +205,8 @@ class ShopeeDownloader {
     }
   }
 
-  async verificarSeEstaLogado(headless = true) {
-    this.log('🕵️ Verificando status do login...', 'info');
+  async verificarSeEstaLogado(headless = true, tentativa = 1, maxTentativas = 3) {
+    this.log(`🕵️ Verificando status do login... (Tentativa ${tentativa}/${maxTentativas})`, 'info');
 
     let browserTest = null;
     let contextTest = null;
@@ -247,7 +247,7 @@ class ShopeeDownloader {
       // ⚡ OTIMIZAÇÃO: domcontentloaded ao invés de networkidle (muito mais rápido)
       await pageTest.goto(CONFIG.URL_HOME, {
         waitUntil: headless ? 'domcontentloaded' : 'networkidle',
-        timeout: 30000
+        timeout: 60000 // Aumentado de 30s para 60s
       });
 
       // ⚡ OTIMIZAÇÃO: Timeout reduzido (3s → 1s quando headless)
@@ -279,6 +279,8 @@ class ShopeeDownloader {
 
     } catch (error) {
       this.log(`   ⚠️ Erro ao verificar login: ${error.message}`, 'warning');
+      
+      // Limpar recursos
       if (contextTest) {
         try {
           await contextTest.close();
@@ -289,6 +291,25 @@ class ShopeeDownloader {
           await browserTest.close();
         } catch (e) {}
       }
+      
+      // Retry automático se for timeout e ainda houver tentativas
+      if (error.message.includes('Timeout') && tentativa < maxTentativas) {
+        this.log(`🔄 Tentando novamente... (${tentativa + 1}/${maxTentativas})`, 'info');
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Aguardar 2s antes de tentar novamente
+        return this.verificarSeEstaLogado(headless, tentativa + 1, maxTentativas);
+      }
+      
+      // Mensagem de erro melhorada
+      if (error.message.includes('Timeout')) {
+        this.log('\n❌ ERRO: Não foi possível acessar a API da Shopee após 3 tentativas.', 'error');
+        this.log('📋 Possíveis causas:', 'info');
+        this.log('   1. Você não está logado na Shopee (faça login primeiro)', 'info');
+        this.log('   2. Sua conexão está lenta ou instável', 'info');
+        this.log('   3. A API da Shopee está fora do ar ou lenta', 'info');
+        this.log('   4. VPN ou firewall bloqueando o acesso', 'info');
+        this.log('\n💡 Solução: Feche a aplicação e tente novamente em alguns minutos.', 'info');
+      }
+      
       return {
         logado: false,
         browser: null,

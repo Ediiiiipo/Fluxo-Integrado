@@ -1320,7 +1320,7 @@ async function buscarLHsNoSPXComCSV(lhIds, stationFolder, currentStationName) {
         // Navegar para SPX
         await page.goto('https://spx.shopee.com.br/#/hubLinehaulTrips/trip', { 
             waitUntil: 'networkidle',
-            timeout: 30000 
+            timeout: 60000 // Aumentado de 30s para 60s
         });
         await page.waitForTimeout(3000);
 

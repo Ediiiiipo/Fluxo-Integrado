@@ -151,7 +151,7 @@ class ExportadorLHs {
         try {
             await page.goto('https://spx.shopee.com.br/#/hubLinehaulTrips/trip', {
                 waitUntil: 'domcontentloaded',
-                timeout: 30000
+                timeout: 60000 // Aumentado de 30s para 60s
             });
         } catch (e) {
             console.log('⚠️ Timeout na navegação inicial (ignorado)');
