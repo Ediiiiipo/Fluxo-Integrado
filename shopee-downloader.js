@@ -1148,10 +1148,36 @@ class ShopeeDownloader {
         this.enviarProgresso(2, `Selecionando station: ${stationParaTrocar}`);
         this.log(`🏢 Trocando para station: ${stationParaTrocar}`, 'info');
 
-        const trocouStation = await this.selecionarStation(stationParaTrocar);
+        // Retry automático (3 tentativas)
+        let trocouStation = false;
+        const maxTentativas = 3;
+        
+        for (let tentativa = 1; tentativa <= maxTentativas; tentativa++) {
+          if (tentativa > 1) {
+            this.log(`🔄 Tentativa ${tentativa}/${maxTentativas} de trocar station...`, 'info');
+            await this.page.waitForTimeout(2000); // Aguardar 2s entre tentativas
+          }
+          
+          trocouStation = await this.selecionarStation(stationParaTrocar);
+          
+          if (trocouStation) {
+            break; // Sucesso!
+          }
+        }
 
         if (!trocouStation) {
-          this.log('❌ ERRO: Não foi possível trocar para a station!', 'error');
+          this.log('❌ ERRO: Não foi possível trocar para a station após 3 tentativas!', 'error');
+          this.log('', 'error');
+          this.log('📋 Possíveis causas:', 'error');
+          this.log('   1. A station não existe ou foi renomeada no SPX', 'error');
+          this.log('   2. Você não tem permissão para acessar essa station', 'error');
+          this.log('   3. O seletor da station mudou (atualize a ferramenta)', 'error');
+          this.log('   4. Conexão lenta ou instável', 'error');
+          this.log('', 'error');
+          this.log('💡 Solução:', 'warning');
+          this.log('   - Verifique se a station existe no SPX', 'warning');
+          this.log('   - Tente trocar manualmente para a station no SPX', 'warning');
+          this.log('   - Feche e abra a ferramenta novamente', 'warning');
           this.log('⚠️ Download cancelado.', 'warning');
           throw new Error(`Falha ao trocar para station: ${stationParaTrocar}`);
         }
