@@ -7,6 +7,9 @@ const {
     ipcRenderer
 } = require('electron');
 
+// Importar tradutor de erros
+const { traduzirErroParaUsuario } = require('./renderer_error_translator.js');
+
 // ======================= ESTADO GLOBAL =======================
 let dadosAtuais = []; // Todos os pedidos carregados
 let lhTrips = {}; // Agrupamento por LH Trip
@@ -695,7 +698,9 @@ async function iniciarDownload() {
                 esconderLoading();
             }
         } else {
-            alert(`❌ Erro no download: ${resultado.error}`);
+            // Traduzir erro técnico para mensagem amigável
+            const mensagemAmigavel = traduzirErroParaUsuario(resultado.error);
+            alert(mensagemAmigavel);
         }
     } catch (error) {
         esconderLoading();
