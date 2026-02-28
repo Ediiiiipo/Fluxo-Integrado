@@ -1657,6 +1657,7 @@ function sugerirPlanejamentoAutomatico() {
     // Atualizar interface
     renderizarTabelaPlanejamento();
     renderizarBacklog();
+    atualizarInfoCiclos(); // ✅ Atualizar cards de ciclo com capacidade correta
     // atualizarInfoSelecao() - Função removida
     
     // Ir para aba de backlog se tiver backlog selecionado
