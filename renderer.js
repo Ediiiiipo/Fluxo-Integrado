@@ -1896,14 +1896,36 @@ function obterCapacidadeCiclo(ciclo) {
     if (!ciclo || ciclo === 'Todos') return 0;
     
     const stationSelecionada = stationAtualNome || '';
-    const stationNormalizada = stationSelecionada.toLowerCase().replace(/lm\s*hub[_\s]*/gi, '').replace(/[_\s]+/g, '');
+    // ✅ Mesma normalização usada em atualizarCardsCiclos
+    const stationNormalizada = stationSelecionada
+        .toLowerCase()
+        .replace(/lm\s*hub[_\s]*/gi, '')
+        .replace(/[_\s]+/g, '')
+        .replace(/st\.?\s*empr/gi, '');
     
-    // Buscar capacidade para esta station e ciclo
-    const capacidadeStation = dadosOutbound.filter(item => {
+    // Buscar capacidade para esta station (match exato primeiro, depois parcial)
+    let capacidadeStation = dadosOutbound.filter(item => {
         const sortCodeName = item['Sort Code Name'] || item['sort_code_name'] || '';
-        const itemNorm = sortCodeName.toLowerCase().replace(/lm\s*hub[_\s]*/gi, '').replace(/[_\s]+/g, '');
-        return itemNorm.includes(stationNormalizada) || stationNormalizada.includes(itemNorm);
+        const itemNorm = sortCodeName
+            .toLowerCase()
+            .replace(/lm\s*hub[_\s]*/gi, '')
+            .replace(/[_\s]+/g, '')
+            .replace(/st\.?\s*empr/gi, '');
+        return itemNorm === stationNormalizada;
     });
+    
+    // Se não encontrou exato, tentar parcial
+    if (capacidadeStation.length === 0) {
+        capacidadeStation = dadosOutbound.filter(item => {
+            const sortCodeName = item['Sort Code Name'] || item['sort_code_name'] || '';
+            const itemNorm = sortCodeName
+                .toLowerCase()
+                .replace(/lm\s*hub[_\s]*/gi, '')
+                .replace(/[_\s]+/g, '')
+                .replace(/st\.?\s*empr/gi, '');
+            return itemNorm.includes(stationNormalizada) || stationNormalizada.includes(itemNorm);
+        });
+    }
     
     // Encontrar registro do ciclo
     const registroCiclo = capacidadeStation.find(cap => {
@@ -1911,7 +1933,10 @@ function obterCapacidadeCiclo(ciclo) {
         return tipoCap.toUpperCase() === ciclo.toUpperCase();
     });
     
-    if (!registroCiclo) return 0;
+    if (!registroCiclo) {
+        console.log(`⚠️ Registro do ciclo ${ciclo} não encontrado. Station normalizada: "${stationNormalizada}"`);
+        return 0;
+    }
     
     // USAR DATA DO CICLO SELECIONADA (não hoje!)
     const dataCiclo = getDataCicloSelecionada();
@@ -1922,11 +1947,14 @@ function obterCapacidadeCiclo(ciclo) {
     const anoHoje = dataCiclo.getFullYear();
     const anoCurto = String(anoHoje).slice(2);
     
+    // ✅ Mesmos 6 formatos usados em atualizarCardsCiclos
     const formatosData = [
-        `${diaHoje}/${mesHoje}/${anoHoje}`,       // 11/01/2026
-        `${diaSemZero}/${mesSemZero}/${anoHoje}`, // 11/1/2026
-        `${diaHoje}/${mesHoje}/${anoCurto}`,      // 11/01/26
-        `${anoHoje}-${mesHoje}-${diaHoje}`,       // 2026-01-11
+        `${diaHoje}/${mesHoje}/${anoHoje}`,       // 01/03/2026
+        `${diaSemZero}/${mesSemZero}/${anoHoje}`, // 1/3/2026
+        `${diaHoje}/${mesHoje}/${anoCurto}`,      // 01/03/26
+        `${anoHoje}-${mesHoje}-${diaHoje}`,       // 2026-03-01
+        `${mesHoje}/${diaHoje}/${anoHoje}`,       // 03/01/2026 (formato americano)
+        `${mesSemZero}/${diaSemZero}/${anoHoje}`, // 3/1/2026 (formato americano sem zero)
     ];
     
     console.log(`📊 obterCapacidadeCiclo: buscando CAP para ${ciclo} em ${formatosData[0]}`);
@@ -1938,8 +1966,29 @@ function obterCapacidadeCiclo(ciclo) {
                 valor = valor.replace(/\./g, '').replace(',', '.');
             }
             const cap = parseFloat(valor) || 0;
-            console.log(`✅ CAP encontrado para ${ciclo} em ${formato}: ${cap}`);
-            return cap;
+            if (cap > 0) {
+                console.log(`✅ CAP encontrado para ${ciclo} em ${formato}: ${cap}`);
+                return cap;
+            }
+        }
+    }
+    
+    // ✅ Busca parcial por dia/mês nas chaves (fallback)
+    const todasChaves = Object.keys(registroCiclo);
+    for (const key of todasChaves) {
+        const keyNorm = key.replace(/\s/g, '');
+        if (keyNorm.includes(`${diaHoje}/${mesHoje}`) ||
+            keyNorm.includes(`${diaSemZero}/${mesSemZero}`) ||
+            keyNorm.includes(`${anoHoje}-${mesHoje}-${diaHoje}`)) {
+            let valor = registroCiclo[key];
+            if (typeof valor === 'string') {
+                valor = valor.replace(/\./g, '').replace(',', '.');
+            }
+            const cap = parseFloat(valor) || 0;
+            if (cap > 0) {
+                console.log(`✅ CAP encontrado (parcial) para ${ciclo} em "${key}": ${cap}`);
+                return cap;
+            }
         }
     }
     
