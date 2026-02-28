@@ -313,6 +313,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Event Listeners - Seletor de Data do Ciclo
     document.getElementById('dataCicloSelecionada')?.addEventListener('change', onDataCicloChange);
+    document.getElementById('dataCicloSelecionada')?.addEventListener('input', onDataCicloChange); // ✅ Atualizar em tempo real ao mudar data
     document.getElementById('btnDataHoje')?.addEventListener('click', setDataCicloHoje);
     
     // Inicializar data do ciclo com hoje
