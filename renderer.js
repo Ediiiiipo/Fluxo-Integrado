@@ -339,7 +339,9 @@ document.addEventListener('DOMContentLoaded', () => {
     carregarDadosPlanilhaLocal();
     
     // ===== ATALHOS DE TECLADO =====
-    // CTRL+U: Usar fase de captura para garantir que seja pego primeiro!
+    // CTRL+U: DESATIVADO - modo visível fixo por padrão
+    // Para reativar no futuro, descomentar o bloco abaixo:
+    /*
     document.addEventListener('keydown', (e) => {
         if (e.ctrlKey && e.key === 'u') {
             console.log('🔍 DEBUG: CTRL+U CAPTURADO NA FASE DE CAPTURA!');
@@ -358,6 +360,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return false;
         }
     }, true); // true = capture phase (pega primeiro!)
+    */
     
     // Outros atalhos
     document.addEventListener('keydown', (e) => {
@@ -8838,9 +8841,9 @@ function fecharAbaConfiguracoes() {
  * Salva preferência no localStorage
  */
 async function toggleModoHeadless() {
-    // Ler estado atual do localStorage (padrão: true - headless ativo)
+    // Ler estado atual do localStorage (padrão: false - modo visível)
     const estadoAtual = localStorage.getItem('modoHeadless');
-    const headlessAtivo = estadoAtual === null ? true : estadoAtual === 'true';
+    const headlessAtivo = estadoAtual === null ? false : estadoAtual === 'true';
     
     console.log(`🔍 DEBUG TOGGLE: Estado atual = ${estadoAtual}`);
     console.log(`🔍 DEBUG TOGGLE: Headless ativo? = ${headlessAtivo}`);

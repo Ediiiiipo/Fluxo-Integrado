@@ -31,7 +31,7 @@ async function loadHeadlessMode() {
   } catch (error) {
     console.error('Erro ao ler modo headless:', error);
   }
-  return true; // Padrão: modo rápido
+  return false; // Padrão: modo visível
 }
 
 // Função para salvar modo headless em arquivo
@@ -44,7 +44,7 @@ async function saveHeadlessMode(headless) {
   }
 }
 
-let globalHeadlessMode = true; // Será carregado na inicialização
+let globalHeadlessMode = false; // Será carregado na inicialização
 
 let mainWindow;
 
