@@ -2657,12 +2657,7 @@ async function atualizarPlanilhaGoogle() {
             atualizarInfoCiclos();
             renderizarTabelaPlanejamento();
 
-            const msg = `✅ Planilhas atualizadas!\n\n` +
-                `📋 ${Object.keys(dadosPlanilha).length} LHs\n` +
-                `⏰ ${resultado.opsClock || 0} registros de ciclos\n` +
-                `📊 ${resultado.outbound || 0} registros de capacidade`;
-            
-            alert(msg);
+            alert('✅ Base de dados atualizadas!');
         } else {
             alert(`❌ Erro ao atualizar: ${resultado.error}`);
         }
