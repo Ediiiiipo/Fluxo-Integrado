@@ -3199,7 +3199,9 @@ function calcularTempoCorte(dadosPlanilhaLH, cicloParam = null) {
             
             // ✅ FILTRAR APENAS REGISTROS ATIVOS
             const isActive = status.includes('Active');
-            const matchStation = (itemNorm === stationBase || itemNorm.includes(stationBase) || stationBase.includes(itemNorm));
+            // ✅ IGNORAR REGISTROS COM STATION VAZIA (evita match falso por includes(''))
+            const hasStation = itemNorm.length > 0;
+            const matchStation = hasStation && (itemNorm === stationBase || itemNorm.includes(stationBase) || stationBase.includes(itemNorm));
             const matchCiclo = dispatchWindow.toUpperCase() === cicloAtual.toUpperCase();
             
             const match = isActive && matchStation && matchCiclo;
