@@ -337,6 +337,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Carregar dados locais da planilha
     carregarDadosPlanilhaLocal();
+
+    // ✅ Verificar se há nova versão disponível (ativa modal bloqueante se houver atualização)
+    verificarEMostrarAtualizacao();
     
     // ===== ATALHOS DE TECLADO =====
     // CTRL+U: DESATIVADO - modo visível fixo por padrão
