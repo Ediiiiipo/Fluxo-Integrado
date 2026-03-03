@@ -4057,7 +4057,8 @@ function renderizarTabelaPlanejamento() {
                 }
             } else if (col === 'tempo_corte') {
                 // Calcular tempo até o horário de corte do ciclo
-                rowData['tempo_corte'] = calcularTempoCorte(dadosPlanilhaLH);
+                // ✅ CORRIGIDO: passar cicloSelecionado para calcular corretamente
+                rowData['tempo_corte'] = calcularTempoCorte(dadosPlanilhaLH, cicloSelecionado);
                 rowData['tempo_corte_minutos'] = rowData['tempo_corte'].minutos; // Para ordenação
             } else {
                 rowData[col] = dadosPlanilhaLH?.[col] || '-';
