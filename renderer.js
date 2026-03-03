@@ -1597,20 +1597,27 @@ function sugerirPlanejamentoAutomatico() {
                 continue; // Pular esta LH
             }
             
-            // 🔒 LHs normais só entram se couberem no CAP
+            // 🔒 LHs normais só entram se couberem no CAP (com tolerância)
+            const TOLERANCIA_CAP = 100; // Permitir ultrapassar até 100 pacotes
             const cabNoCAP = totalSelecionado + lhInfo.qtdPedidos <= capCiclo;
+            const ultrapassagem = (totalSelecionado + lhInfo.qtdPedidos) - capCiclo;
+            const cabComTolerancia = ultrapassagem > 0 && ultrapassagem <= TOLERANCIA_CAP;
             
-            console.log(`🔍 VERIFICANDO INCLUSÃO: ${lhInfo.lhTrip} | cabNoCAP=${cabNoCAP}`);
+            console.log(`🔍 VERIFICANDO INCLUSÃO: ${lhInfo.lhTrip} | cabNoCAP=${cabNoCAP} | ultrapassagem=${ultrapassagem} | cabComTolerancia=${cabComTolerancia}`);
             
-            if (cabNoCAP) {
-                // LH normal que cabe no CAP
+            if (cabNoCAP || cabComTolerancia) {
+                // LH normal que cabe no CAP (ou ultrapassa dentro da tolerância de 100)
                 lhsSelecionadasPlan.add(lhInfo.lhTrip);
                 lhsSugeridas.push(lhInfo);
                 totalSelecionado += lhInfo.qtdPedidos;
                 
                 if (lhInfo.isBacklogPiso) backlogsPisoSelecionados++;
                 
-                console.log(`✅ LH ${lhInfo.lhTrip} INCLUÍDA (cabe no CAP): ${lhInfo.qtdPedidos} pedidos (corte em ${lhInfo.minutosCorte || '?'} min)`);
+                if (cabComTolerancia) {
+                    console.log(`✅ LH ${lhInfo.lhTrip} INCLUÍDA (tolerância +${ultrapassagem} pacotes): ${lhInfo.qtdPedidos} pedidos (corte em ${lhInfo.minutosCorte || '?'} min)`);
+                } else {
+                    console.log(`✅ LH ${lhInfo.lhTrip} INCLUÍDA (cabe no CAP): ${lhInfo.qtdPedidos} pedidos (corte em ${lhInfo.minutosCorte || '?'} min)`);
+                }
             } else if (totalSelecionado < capCiclo) {
                 // 🎯 FIFO: Próxima LH que não cabe no CAP
                 // Não incluir LH completa, mas marcar para sugestão de TOs
@@ -1622,13 +1629,17 @@ function sugerirPlanejamentoAutomatico() {
                 lhInfo.candidataParaTOs = true;
                 lhInfo.qtdNecessaria = faltam;
                 
-                // Armazenar para sugestão posterior
+                // Armazenar para sugestão posterior (pode ser limpo pelo swap)
                 window.lhCandidataParaTOs = lhInfo;
                 
-                // 💚 MOSTRAR BANNER automaticamente após renderização
+                // 💚 MOSTRAR BANNER - adiado para depois do swap (se swap resolver, não mostra)
                 setTimeout(() => {
-                    console.log(`💚 Banner: Chamando mostrarBannerLHCandidata para ${lhInfo.lhTrip}`);
-                    mostrarBannerLHCandidata(lhInfo, faltam, capCiclo);
+                    if (window.lhCandidataParaTOs) {
+                        console.log(`💚 Banner: Chamando mostrarBannerLHCandidata para ${lhInfo.lhTrip}`);
+                        mostrarBannerLHCandidata(lhInfo, faltam, capCiclo);
+                    } else {
+                        console.log(`💚 Banner cancelado - swap já resolveu o CAP`);
+                    }
                 }, 800);
                 
                 break; // Parar após primeira LH que não cabe (prioridade FIFO)
@@ -1642,6 +1653,73 @@ function sugerirPlanejamentoAutomatico() {
         if (lhsNoPisoComEstouro.length > 0) {
             window.lhsComEstouroPiso = lhsNoPisoComEstouro;
             console.log(`🟡 ${lhsNoPisoComEstouro.length} LH(s) No Piso com estouro tolerado - sugestão de TOs disponível`);
+        }
+        
+        // ============================================
+        // 🔄 OTIMIZAÇÃO PÓS-SELEÇÃO: Swap inteligente
+        // Se ainda falta muito volume, verificar se trocar a última LH 
+        // por uma LH maior resultaria em total mais próximo do CAP
+        // ============================================
+        const TOLERANCIA_CAP = 100;
+        const faltamAposSelecao = capCiclo - totalSelecionado;
+        const percentualFaltante = (faltamAposSelecao / capCiclo) * 100;
+        
+        // Só tentar swap se faltar entre 100 e 40% do CAP
+        // Se falta mais de 40%, é muito distante - seguir fluxo normal com TOs
+        if (faltamAposSelecao > TOLERANCIA_CAP && percentualFaltante <= 40 && lhsSugeridas.length >= 1) {
+            console.log(`\n🔄 [OTIMIZAÇÃO] Faltam ${faltamAposSelecao} pedidos (${percentualFaltante.toFixed(1)}%) - verificando swap...`);
+            
+            // LHs que não foram selecionadas (e não são bloqueadas/P3)
+            const lhsNaoSelecionadas = lhsComInfo.filter(lh => 
+                !lhsSelecionadasPlan.has(lh.lhTrip) && 
+                lh.statusLH?.codigo !== 'P3' && 
+                !(lh.minutosCorte !== null && lh.minutosCorte < 0)
+            );
+            
+            // Testar substituir cada LH selecionada por cada não-selecionada
+            let melhorSwap = null;
+            let melhorDistancia = faltamAposSelecao; // distância atual do CAP
+            
+            for (let i = 0; i < lhsSugeridas.length; i++) {
+                const lhRemover = lhsSugeridas[i];
+                const totalSemEla = totalSelecionado - lhRemover.qtdPedidos;
+                
+                for (const lhNova of lhsNaoSelecionadas) {
+                    const totalComNova = totalSemEla + lhNova.qtdPedidos;
+                    const distanciaComNova = Math.abs(totalComNova - capCiclo);
+                    
+                    // Aceitar swap se: resultado mais próximo do CAP E dentro da tolerância
+                    if (distanciaComNova < melhorDistancia && totalComNova <= capCiclo + TOLERANCIA_CAP) {
+                        melhorSwap = { indiceRemover: i, lhRemover, lhNova, totalComNova, distanciaComNova };
+                        melhorDistancia = distanciaComNova;
+                    }
+                }
+            }
+            
+            if (melhorSwap) {
+                console.log(`✅ [OTIMIZAÇÃO] SWAP encontrado!`);
+                console.log(`   Remover: ${melhorSwap.lhRemover.lhTrip} (${melhorSwap.lhRemover.qtdPedidos} pedidos)`);
+                console.log(`   Adicionar: ${melhorSwap.lhNova.lhTrip} (${melhorSwap.lhNova.qtdPedidos} pedidos)`);
+                console.log(`   Novo total: ${melhorSwap.totalComNova.toLocaleString('pt-BR')} (distância do CAP: ${melhorSwap.distanciaComNova})`);
+                console.log(`   Total anterior: ${totalSelecionado.toLocaleString('pt-BR')} (distância do CAP: ${faltamAposSelecao})`);
+                
+                // Aplicar swap
+                const lhRemovida = lhsSugeridas.splice(melhorSwap.indiceRemover, 1)[0];
+                lhsSelecionadasPlan.delete(lhRemovida.lhTrip);
+                totalSelecionado -= lhRemovida.qtdPedidos;
+                
+                lhsSugeridas.push(melhorSwap.lhNova);
+                lhsSelecionadasPlan.add(melhorSwap.lhNova.lhTrip);
+                totalSelecionado += melhorSwap.lhNova.qtdPedidos;
+                
+                // Limpar candidata de TOs se o swap resolveu
+                if (totalSelecionado >= capCiclo - TOLERANCIA_CAP) {
+                    window.lhCandidataParaTOs = null;
+                    window.lhComplementoSugerida = null;
+                }
+            } else {
+                console.log(`ℹ️ [OTIMIZAÇÃO] Nenhum swap melhora a situação`);
+            }
         }
         
         console.log(`✅ LHs selecionadas: ${lhsSugeridas.length}`);
@@ -1785,7 +1863,8 @@ function sugerirPlanejamentoAutomatico() {
     console.log('═'.repeat(50));
     
     // 💬 MOSTRAR BANNER VERDE se houver LH candidata para complemento
-    if (window.lhComplementoSugerida) {
+    // (Não mostrar se swap já resolveu - window.lhCandidataParaTOs será null)
+    if (window.lhComplementoSugerida && window.lhCandidataParaTOs) {
         const lhCandidata = window.lhComplementoSugerida;
         const faltam = lhCandidata.faltam;
         
@@ -1796,6 +1875,8 @@ function sugerirPlanejamentoAutomatico() {
         setTimeout(() => {
             mostrarBannerLHCandidata(lhCandidata, faltam, capCiclo);
         }, 500);
+    } else if (!window.lhCandidataParaTOs) {
+        console.log(`💚 Banner não exibido - swap resolveu o CAP`);
     }
     
     // 🔒 BLOQUEAR LHs NÃO SUGERIDAS
