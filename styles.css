@@ -1779,10 +1779,14 @@ tbody tr:hover {
   background: linear-gradient(90deg, #ffe0b2 0%, #f8f9fa 100%) !important;
 }
 
-/* Se for FULL E SELECIONADA, manter amarelo */
+/* Se for FULL E SELECIONADA, usar destaque AZUL padrão */
 .planejamento-table tbody tr.lh-full.row-selecionada {
-  background: linear-gradient(90deg, #fff3e0 0%, #ffffff 100%) !important;
-  border-left: 4px solid #ff9800;
+  background: #e3f2fd !important;
+  border-left: 4px solid #2196f3;
+}
+
+.planejamento-table tbody tr.lh-full.row-selecionada:hover {
+  background: #bbdefb !important;
 }
 
 /* Remover classe lh-dentro-limite (verde) */
@@ -3243,4 +3247,77 @@ tbody tr:hover {
   50% {
     box-shadow: 0 4px 25px rgba(102, 126, 234, 0.7);
   }
+}
+
+
+/* ============================================
+   BLOQUEIO FIFO - APENAS PRIMEIRA LH CLICÁVEL
+   ============================================ */
+.planejamento-table tbody tr.lh-bloqueada-fifo {
+    opacity: 0.6;
+    cursor: not-allowed !important;
+    position: relative;
+}
+
+.planejamento-table tbody tr.lh-bloqueada-fifo:hover {
+    background: #f5f5f5 !important;
+}
+
+.planejamento-table tbody tr.lh-bloqueada-fifo::after {
+    content: '🔒';
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 16px;
+    opacity: 0.5;
+}
+
+.planejamento-table tbody tr.lh-bloqueada-fifo input[type="checkbox"] {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.planejamento-table tbody tr.lh-primeira-fifo {
+    cursor: pointer;
+}
+
+.planejamento-table tbody tr.lh-primeira-fifo:hover {
+    background: #e8f5e9 !important;
+}
+
+
+/* ============================================
+   BLOQUEIO DE LHs PÓS-PLANEJAMENTO
+   ============================================ */
+.planejamento-table tbody tr.lh-bloqueada-planejamento {
+    opacity: 0.5;
+    cursor: not-allowed !important;
+    position: relative;
+    background: #f5f5f5 !important;
+}
+
+.planejamento-table tbody tr.lh-bloqueada-planejamento:hover {
+    background: #eeeeee !important;
+}
+
+.planejamento-table tbody tr.lh-bloqueada-planejamento::after {
+    content: '🔒';
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 16px;
+    opacity: 0.7;
+}
+
+.planejamento-table tbody tr.lh-bloqueada-planejamento input[type="checkbox"] {
+    cursor: not-allowed !important;
+    opacity: 0.4;
+}
+
+/* LH candidata de complemento mantém destaque */
+.planejamento-table tbody tr.lh-candidata-complemento {
+    cursor: pointer !important;
+    opacity: 1 !important;
 }
