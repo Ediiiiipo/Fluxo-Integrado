@@ -35,6 +35,10 @@ let lhTripsBacklog = {}; // LH Trips que são backlog (agrupado)
 let lhTripsPlanejáveis = {}; // LH Trips planejáveis (agrupado)
 let lhsLixoSistemico = []; // LHs filtradas automaticamente (sem origin/destination/previsão)
 
+// 🔒 Estado de bloqueio pós-planejamento
+let lhsBloqueadasPlanejamento = new Set();
+let bloqueioAtivoPosPlanejamento = false;
+
 // Status que identificam Backlog (lowercase, sem espaços)
 const STATUS_BACKLOG = [
     'lmhub_received', 
@@ -848,7 +852,7 @@ function processarDados() {
     console.log(`\n🔍 DEBUG ANTES PROCESSAMENTO: ${lhEspecificaDebug}`);
     console.log(`   Total de pedidos: ${pedidosLHAntes.length}`);
     
-    dadosAtuais.forEach((row, rowIndex) => {
+    dadosAtuais.forEach(row => {
         let lh = row[colunaLH] || '(vazio)';
         const status = row[colunaStatus] || '';
         
@@ -1313,7 +1317,7 @@ function renderizarTabela(pedidos) {
     const maxLinhas = 1000;
     const pedidosExibir = pedidosFiltrados.slice(0, maxLinhas);
 
-    pedidosExibir.forEach((row, rowIndex) => {
+    pedidosExibir.forEach(row => {
         html += '<tr>';
         colunas.forEach(col => {
             const valor = row[col];
@@ -1367,182 +1371,18 @@ function limparTodosFiltros() {
 function limparTodosFiltrosPlan() {
     filtrosAtivosPlan = {};
     renderizarTabelaPlanejamento();
-    
-    // ============================================
-    // BLOQUEAR LHs NÃO SUGERIDAS
-    // ============================================
-    console.log('🔒 [BLOQUEIO] Chamando função de bloqueio...');
-    const lhsSelecionadasIds = lhsSelecionadas.map(lh => lh.lhTrip);
-    console.log('🔒 [BLOQUEIO] IDs das LHs selecionadas:', lhsSelecionadasIds);
-    console.log('🔒 [BLOQUEIO] LH candidata:', lhCandidataComplemento?.lhTrip || null);
-    
-    if (typeof bloquearLHsNaoSugeridas === 'function') {
-        bloquearLHsNaoSugeridas(lhsSelecionadasIds, lhCandidataComplemento?.lhTrip || null);
-    } else {
-        console.error('❌ [BLOQUEIO] Função bloquearLHsNaoSugeridas não encontrada!');
-    }
 }
-
 
 // ======================= SUGESTÃO AUTOMÁTICA DE PLANEJAMENTO =======================
-
-// ============================================
-// VALIDAÇÃO DE JANELA DE HORÁRIO
-// ============================================
-function validarJanelaHorario(cicloNome, horaFim, dataSelecionada) {
-    // Validação simplificada de janela de horário
-    const agora = new Date();
-    const dataComparacao = new Date(dataSelecionada);
-    
-    // Normalizar datas
-    const agoraData = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
-    const dataSelData = new Date(dataComparacao.getFullYear(), dataComparacao.getMonth(), dataComparacao.getDate());
-    
-    // Se for dia futuro, está disponível
-    if (dataSelData > agoraData) {
-        return { valido: true, mensagem: '' };
-    }
-    
-    // Se for hoje, verificar se horário já passou
-    if (dataSelData.getTime() === agoraData.getTime() && horaFim) {
-        const [hora, minuto] = horaFim.split(':').map(Number);
-        const limiteHoje = new Date(agora);
-        limiteHoje.setHours(hora, minuto, 0, 0);
-        
-        if (agora > limiteHoje) {
-            return { 
-                valido: false, 
-                mensagem: `⏰ Ciclo ${cicloNome} encerrado para hoje (fim às ${horaFim})` 
-            };
-        }
-    }
-    
-    return { valido: true, mensagem: '' };
-}
-
-
-// ============================================
-// BLOQUEIO DE LHs APÓS PLANEJAMENTO
-// ============================================
-function bloquearLHsNaoSugeridas(lhsSelecionadas, lhCandidata) {
-    console.log('🔒 Bloqueando LHs não sugeridas...');
-    console.log('   LHs selecionadas:', lhsSelecionadas);
-    console.log('   LH candidata:', lhCandidata);
-    
-    const linhas = document.querySelectorAll('.planejamento-table tbody tr:not(.brs-row)');
-    
-    linhas.forEach(linha => {
-        const checkbox = linha.querySelector('input[type="checkbox"]');
-        if (!checkbox) return;
-        
-        const lhTrip = checkbox.dataset.id;
-        
-        // Verificar se é uma LH selecionada ou candidata
-        const ehSelecionada = lhsSelecionadas.includes(lhTrip);
-        const ehCandidata = lhTrip === lhCandidata;
-        const ehBloqueadaP3 = linha.classList.contains('lh-bloqueada'); // P3 permanente
-        
-        if (!ehSelecionada && !ehCandidata && !ehBloqueadaP3) {
-            // Bloquear esta LH
-            linha.classList.add('lh-bloqueada-planejamento');
-            linha.style.opacity = '0.5';
-            linha.style.cursor = 'not-allowed';
-            linha.title = '🔒 LH não sugerida para este planejamento. Sincronize o SPX para atualizar.';
-            
-            // Desabilitar checkbox
-            checkbox.disabled = true;
-            
-            // Prevenir clique
-            linha.onclick = function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                mostrarAlertaBloqueio();
-                return false;
-            };
-            
-            console.log(`   🔒 ${lhTrip} bloqueada`);
-        } else {
-            console.log(`   ✅ ${lhTrip} permitida (selecionada=${ehSelecionada}, candidata=${ehCandidata})`);
-        }
-    });
-}
-
-function desbloquearTodasLHs() {
-    console.log('🔓 Desbloqueando todas as LHs...');
-    
-    const linhas = document.querySelectorAll('.planejamento-table tbody tr.lh-bloqueada-planejamento');
-    
-    linhas.forEach(linha => {
-        const checkbox = linha.querySelector('input[type="checkbox"]');
-        if (!checkbox) return;
-        
-        linha.classList.remove('lh-bloqueada-planejamento');
-        linha.style.opacity = '';
-        linha.style.cursor = '';
-        linha.title = '';
-        checkbox.disabled = false;
-        linha.onclick = null;
-        
-        console.log(`   🔓 ${checkbox.dataset.id} desbloqueada`);
-    });
-}
-
-function mostrarAlertaBloqueio() {
-    const alerta = document.createElement('div');
-    alerta.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: #ff5722;
-        color: white;
-        padding: 15px 20px;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        z-index: 10000;
-        font-weight: 500;
-    `;
-    alerta.innerHTML = `
-        🔒 <strong>LH bloqueada</strong><br>
-        Use a LH sugerida ou sincronize o SPX
-    `;
-    
-    document.body.appendChild(alerta);
-    
-    setTimeout(() => {
-        alerta.remove();
-    }, 3000);
-}
-
-
-
-
-
-    // Aplicar imediatamente
-    
-    // Observar mudanças na tabela
-    const observer = new MutationObserver(() => {
-    });
-    
-    // Aguardar tabela existir
-    const interval = setInterval(() => {
-        const tabela = document.querySelector('.planejamento-table tbody');
-        if (tabela) {
-            clearInterval(interval);
-            observer.observe(tabela, { childList: true, subtree: true });
-        }
-    }, 500);
-
-
-
 function sugerirPlanejamentoAutomatico() {
     // Marcar início da execução
     tempoInicioExecucao = Date.now();
     
+    // 🔓 Limpar bloqueio anterior
+    limparBloqueioPosPlanejamento();
+    
     console.log("🎯 Função sugerirPlanejamentoAutomatico chamada");
     console.log("📍 cicloSelecionado atual:", cicloSelecionado);
-    
-    // ⏰ VALIDAR JANELA DE HORÁRIO (validação básica)
-    // Nota: Validação detalhada será feita durante o planejamento individual de cada LH
     
     // DETECÇÃO AUTOMÁTICA: Se tem CAP Manual definido, usa ele
     let cicloParaUsar = cicloSelecionado;
@@ -1713,8 +1553,10 @@ function sugerirPlanejamentoAutomatico() {
             
             if (prioA !== prioB) return prioA - prioB;
             
-            // Prioridade 5: Quantidade de pedidos (maior primeiro)
-            return b.qtdPedidos - a.qtdPedidos;
+            // Prioridade 5: 🔥 MENOR volume primeiro (FIFO eficiente)
+            // LHs pequenas são "mortas" primeiro no planejamento
+            console.log(`🔢 Desempate por volume: ${a.lhTrip}(${a.qtdPedidos}) vs ${b.lhTrip}(${b.qtdPedidos})`);
+            return a.qtdPedidos - b.qtdPedidos; // MENOR → MAIOR (CRESCENTE)
         });
         
         console.log('📊 LHs após ordenação:');
@@ -1827,10 +1669,10 @@ function sugerirPlanejamentoAutomatico() {
         lhsBloqueadas: lhsBloqueadas || 0
     });
     
-    // 🧹 LIMPAR CAP MANUAL após gerar planejamento
-    // capsManual = {}; // ❌ Não limpar - manter até sincronizar SPX
-   // console.log('🧹 CAP Manual limpo após gerar planejamento');
-    //capsManual = {};
+    // ✅ NÃO limpar CAP Manual - manter até sincronização
+    // capsManual = {};
+    // localStorage.removeItem('capsManual');
+    console.log('✅ CAP Manual mantido:', JSON.stringify(capsManual));
     
     // Atualizar interface
     renderizarTabelaPlanejamento();
@@ -1955,6 +1797,52 @@ function sugerirPlanejamentoAutomatico() {
             mostrarBannerLHCandidata(lhCandidata, faltam, capCiclo);
         }, 500);
     }
+    
+    // 🔒 BLOQUEAR LHs NÃO SUGERIDAS
+    const lhsSelecionadasIds = Array.from(lhsSelecionadasPlan);
+    const lhCandidataId = window.lhComplementoSugerida?.lhTrip || null;
+    setTimeout(() => {
+        bloquearLHsPosPlanejamento(lhsSelecionadasIds, lhCandidataId);
+    }, 600);
+}
+
+// 🔒 BLOQUEIO DE LHs PÓS-PLANEJAMENTO
+function bloquearLHsPosPlanejamento(lhsSelecionadasIds, lhCandidataId) {
+    console.log('🔒 [BLOQUEIO] Iniciando bloqueio...');
+    console.log('🔒 [BLOQUEIO] Selecionadas:', lhsSelecionadasIds);
+    console.log('🔒 [BLOQUEIO] Candidata:', lhCandidataId);
+    
+    lhsBloqueadasPlanejamento.clear();
+    const todasLHs = Object.keys(lhTripsPlanejáveis).filter(lh => lh && lh !== '(vazio)' && lh.trim() !== '');
+    
+    todasLHs.forEach(lhTrip => {
+        const ehSelecionada = lhsSelecionadasIds.includes(lhTrip);
+        const ehCandidata = lhCandidataId && lhTrip === lhCandidataId;
+        if (!ehSelecionada && !ehCandidata) {
+            lhsBloqueadasPlanejamento.add(lhTrip);
+        }
+    });
+    
+    bloqueioAtivoPosPlanejamento = true;
+    console.log('🔒 [BLOQUEIO] ' + lhsBloqueadasPlanejamento.size + ' LHs bloqueadas de ' + todasLHs.length);
+    renderizarTabelaPlanejamento();
+}
+
+function desbloquearLHPorStatusSPX(lhTrip, statusTexto) {
+    if (!lhsBloqueadasPlanejamento.has(lhTrip)) return;
+    const sNorm = String(statusTexto).toLowerCase().trim();
+    const desbloqueiam = ['no piso','arrived','p1','aguardando descarga','aguardando descarregamento',
+                          'em trânsito','em transito','in transit','transit','desembarcando'];
+    if (desbloqueiam.some(s => sNorm.includes(s))) {
+        lhsBloqueadasPlanejamento.delete(lhTrip);
+        console.log('🔓 LH ' + lhTrip + ' desbloqueada (status: ' + statusTexto + ')');
+        if (lhsBloqueadasPlanejamento.size === 0) bloqueioAtivoPosPlanejamento = false;
+    }
+}
+
+function limparBloqueioPosPlanejamento() {
+    lhsBloqueadasPlanejamento.clear();
+    bloqueioAtivoPosPlanejamento = false;
 }
 
 // Extrair data para ordenação FIFO
@@ -2280,12 +2168,7 @@ function atualizarCardSugestao() {
     
     // Calcular novo total
     const totalSelecionado = calcularTotalSelecionado();
-    
-    // ⚡ SEMPRE usar CAP manual se estiver definido - PRIORIDADE
-    const capManual = obtemCapManual(cicloSelecionado);
-    const capCiclo = (capManual !== null && capManual > 0) ? capManual : obterCapacidadeCicloAtual();
-    
-    console.log('🔄 [CARD ATUALIZAÇÃO] CAP usado:', capCiclo, '(manual:', capManual, ', auto:', obterCapacidadeCicloAtual(), ')');
+    const capCiclo = obterCapacidadeCicloAtual();
     const percentualCap = capCiclo > 0 ? ((totalSelecionado / capCiclo) * 100).toFixed(1) : 0;
     
     // Atualizar apenas os números do card
@@ -2705,7 +2588,7 @@ function atualizarPreviewConfig() {
 
     // Mostrar 3 linhas de exemplo
     const exemplos = dadosAtuais.slice(0, 3);
-    exemplos.forEach((row, rowIndex) => {
+    exemplos.forEach(row => {
         html += '<tr>';
         colunasSelecionadas.forEach(col => {
             const valor = row[col];
@@ -2835,10 +2718,6 @@ async function carregarDadosPlanilhaLocal() {
 
             atualizarInfoPlanilha();
             renderizarTabelaPlanejamento();
-    
-    // Bloquear LHs não sugeridas
-    const lhsSelecionadasIds = lhsSelecionadas.map(lh => lh.lhTrip);
-    bloquearLHsNaoSugeridas(lhsSelecionadasIds, lhCandidataComplemento?.lhTrip || null);
         }
     } catch (error) {
         console.log('Nenhum dado local da planilha encontrado');
@@ -4240,8 +4119,7 @@ function renderizarTabelaPlanejamento() {
                 }
             } else if (col === 'tempo_corte') {
                 // Calcular tempo até o horário de corte do ciclo
-                // ✅ CORRIGIDO: passar cicloSelecionado para calcular corretamente
-                rowData['tempo_corte'] = calcularTempoCorte(dadosPlanilhaLH, cicloSelecionado);
+                rowData['tempo_corte'] = calcularTempoCorte(dadosPlanilhaLH);
                 rowData['tempo_corte_minutos'] = rowData['tempo_corte'].minutos; // Para ordenação
             } else {
                 rowData[col] = dadosPlanilhaLH?.[col] || '-';
@@ -4259,7 +4137,7 @@ function renderizarTabelaPlanejamento() {
     if (lhsLixoSistemico.length > 0) {
         const totalPedidosLixo = lhsLixoSistemico.reduce((sum, row) => sum + (row.pedidos || 0), 0);
         console.log(`🗑️ ${lhsLixoSistemico.length} LHs de lixo sistêmico filtradas automaticamente (${totalPedidosLixo} pedidos):`);
-        lhsLixoSistemico.forEach((row, rowIndex) => {
+        lhsLixoSistemico.forEach(row => {
             console.log(`   - ${row.lh_trip} (${row.pedidos} pedidos)`);
         });
         
@@ -4368,7 +4246,7 @@ function renderizarTabelaPlanejamento() {
     let naoEncontradas = 0;
     let totalPedidos = 0;
 
-    dadosTabela.forEach((row, rowIndex) => {
+    dadosTabela.forEach(row => {
         if (row.encontrada) encontradas++;
         else naoEncontradas++;
         totalPedidos += row.pedidos;
@@ -4437,7 +4315,7 @@ function renderizarTabelaPlanejamento() {
     // Gerar HTML da tabela
     let html = '';
 
-    dadosTabela.forEach((row, rowIndex) => {
+    dadosTabela.forEach(row => {
         const selecionada = lhsSelecionadasPlan.has(row.lh_trip);
         // Adicionar classe especial para LHs dentro do limite de corte
         // LHs FULL também recebem o destaque azul (aderentes)
@@ -4446,9 +4324,16 @@ function renderizarTabelaPlanejamento() {
         // Verificar se a LH está bloqueada (status P3 - fora do prazo)
         const statusLH = row.status_lh;
         
-        // IMPORTANTE: Se foi validado pelo SPX, NUNCA bloqueia
-        const lhBloqueada = statusLH && !statusLH._spxValidado && statusLH.isBloqueada;
-        const motivoBloqueio = lhBloqueada ? 'LH em trânsito - não chegará a tempo para este ciclo' : '';
+        // IMPORTANTE: Se foi validado pelo SPX, NUNCA bloqueia por P3
+        const lhBloqueadaP3 = statusLH && !statusLH._spxValidado && statusLH.isBloqueada;
+        
+        // 🔒 Bloqueio PÓS-PLANEJAMENTO (LHs não sugeridas)
+        const bloqueadaPorPlanejamento = bloqueioAtivoPosPlanejamento && lhsBloqueadasPlanejamento.has(row.lh_trip);
+        
+        // Bloqueio final: P3 OU pós-planejamento (exceto se já selecionada)
+        const lhBloqueada = lhBloqueadaP3 || (bloqueadaPorPlanejamento && !selecionada);
+        const motivoBloqueio = lhBloqueadaP3 ? 'LH em trânsito - não chegará a tempo para este ciclo' 
+                             : bloqueadaPorPlanejamento ? 'LH não sugerida neste planejamento' : '';
         
         // DEBUG: Log do status na renderização
         if (statusLH && (statusLH.codigo === 'P2' || statusLH.codigo === 'P3' || statusLH._spxValidado)) {
@@ -4464,7 +4349,7 @@ function renderizarTabelaPlanejamento() {
                                       window.lhCandidataParaTOs.lhTrip === row.lh_trip;
         const tituloComplemento = candidataComplemento ? '💚 Próxima LH FIFO - pode ser usada para completar CAP via TOs' : '';
         
-        html += `<tr class="${row.isFull ? 'lh-full' : ''} ${selecionada ? 'row-selecionada' : ''} ${dentroLimite ? 'lh-dentro-limite' : ''} ${lhBloqueada ? 'lh-bloqueada' : ''} ${comEstouroPiso ? 'lh-estouro-piso' : ''} ${candidataComplemento ? 'lh-candidata-complemento' : ''}" ${lhBloqueada ? `title="🔒 ${motivoBloqueio}"` : (candidataComplemento ? `title="${tituloComplemento}"` : (comEstouroPiso ? `title="${tituloEstouro}"` : ''))}>`;
+        html += `<tr class="${row.isFull ? 'lh-full' : ''} ${selecionada ? 'row-selecionada' : ''} ${dentroLimite ? 'lh-dentro-limite' : ''} ${lhBloqueada ? 'lh-bloqueada' : ''} ${bloqueadaPorPlanejamento && !selecionada ? 'lh-bloqueada-planejamento' : ''} ${comEstouroPiso ? 'lh-estouro-piso' : ''} ${candidataComplemento ? 'lh-candidata-complemento' : ''}" ${lhBloqueada ? `title="🔒 ${motivoBloqueio}"` : (candidataComplemento ? `title="${tituloComplemento}"` : (comEstouroPiso ? `title="${tituloEstouro}"` : ''))}>`;
         
         // Coluna de checkbox
         html += `<td>
@@ -5602,11 +5487,12 @@ let lhAtualModal = null; // LH sendo editada no modal
 // ===== FUNÇÕES DO MODAL DE TOs =====
 
 function abrirModalTOs(lhTrip) {
-    console.log('📦 [MODAL TOs] Abrindo modal para:', lhTrip);
-    console.log('📦 [MODAL TOs] Ciclo selecionado:', cicloSelecionado);
-    console.log('📦 [MODAL TOs] capsManual atual:', capsManual);
-    console.log('📦 [MODAL TOs] CAP manual deste ciclo:', obtemCapManual(cicloSelecionado));
-    console.log('📦 [MODAL TOs] CAP que será usado:', obterCapacidadeCicloAtual());
+    // 🔒 Verificar bloqueio pós-planejamento
+    if (bloqueioAtivoPosPlanejamento && lhsBloqueadasPlanejamento.has(lhTrip)) {
+        console.log('🔒 Modal bloqueado para LH:', lhTrip);
+        alert('🔒 LH bloqueada\n\nEsta LH não foi sugerida no planejamento.\nSincronize com o SPX para atualizar.');
+        return;
+    }
     lhAtualModal = lhTrip;
     
     // Buscar TOs da LH na planilha
@@ -5998,14 +5884,12 @@ function confirmarSelecaoTOs() {
 function obterCapacidadeCicloAtual() {
     if (!cicloSelecionado || cicloSelecionado === 'Todos') return 0;
     
-    // ⚡ SEMPRE VERIFICAR CAP MANUAL PRIMEIRO - PRIORIDADE ABSOLUTA
+    // VERIFICAR CAP MANUAL PRIMEIRO
     const capManual = obtemCapManual(cicloSelecionado);
-    if (capManual !== null && capManual > 0) {
-        console.log('✅ [CAP MANUAL] Usando CAP Manual:', cicloSelecionado, '=', capManual);
+    if (capManual !== null) {
+        console.log('✅ Usando CAP Manual no modal:', cicloSelecionado, '=', capManual);
         return capManual;
     }
-    
-    console.log('⚠️ [CAP AUTO] CAP Manual não encontrado, usando automático');
     
     // Se não tem CAP Manual, pegar do Google Sheets
     const stationSelecionada = stationAtualNome || '';
@@ -6089,6 +5973,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (cell) {
                 const lhTrip = cell.textContent.trim().split('\n')[0].trim();
                 if (lhTrip && lhTrip !== '-') {
+                    // 🔒 Verificar bloqueio
+                    const tr = cell.closest('tr');
+                    if (tr && (tr.classList.contains('lh-bloqueada') || tr.classList.contains('lh-bloqueada-planejamento'))) {
+                        console.log('🔒 Duplo clique bloqueado:', lhTrip);
+                        return;
+                    }
                     abrirModalTOs(lhTrip);
                 }
             }
@@ -7975,10 +7865,6 @@ function gerarRelatorioFinal() {
  * Sincroniza LHs visíveis com dados do SPX e gera CSV
  */
 async function sincronizarLHsSPX() {
-    // Limpar CAP manual antes de sincronizar com SPX
-    console.log('🔄 [SPX] Limpando CAP manual antes de sincronizar...');
-    capsManual = {};
-    
     try {
         // Pegar todas as LHs visíveis na tabela
         const lhsVisiveis = obterLHsVisiveis();
@@ -8035,41 +7921,6 @@ async function sincronizarLHsSPX() {
                 // Processar e atualizar visual na tabela
                 if (resultado.data.resultados && resultado.data.resultados.length > 0) {
                     processarResultadosSPXComCSV(resultado.data.resultados);
-                    
-                    // ============================================
-                    // DESBLOQUEAR LHs se status mudou
-                    // ============================================
-                    if (resultado.data.resultados && resultado.data.resultados.length > 0) {
-                        resultado.data.resultados.forEach(res => {
-                            const statusSPX = (res.status_spx || '').toUpperCase();
-                            
-                            // Desbloquear se status for P1, Piso, Descarga ou Trânsito
-                            const deveDesbloquear = (
-                                statusSPX.includes('P1') ||
-                                statusSPX.includes('PISO') ||
-                                statusSPX.includes('DESCARGA') ||
-                                statusSPX.includes('AGUARDANDO') ||
-                                statusSPX.includes('TRÂNSITO') ||
-                                statusSPX.includes('TRANSITO')
-                            );
-                            
-                            if (deveDesbloquear) {
-                                const linha = document.querySelector(`input[data-id="${res.lh_trip}"]`)?.closest('tr');
-                                if (linha && linha.classList.contains('lh-bloqueada-planejamento')) {
-                                    linha.classList.remove('lh-bloqueada-planejamento');
-                                    linha.style.opacity = '';
-                                    linha.style.cursor = '';
-                                    linha.title = '';
-                                    const checkbox = linha.querySelector('input[type="checkbox"]');
-                                    if (checkbox) {
-                                        checkbox.disabled = false;
-                                    }
-                                    linha.onclick = null;
-                                    console.log(`🔓 LH ${res.lh_trip} desbloqueada (status: ${res.status_spx})`);
-                                }
-                            }
-                        });
-                    }
                 }
             } else {
                 alert(msg + '⚠️ Nenhuma LH foi encontrada no SPX.');
@@ -8505,6 +8356,11 @@ function processarResultadosSPXComCSV(resultados) {
                         statusAtualizados++;
                         totalAtualizados++;
                         console.log(`   ✅ Status atualizado: ${lhId} → ${novoStatusFront.texto} (SPX: ${statusSPX})`);
+                        
+                        // 🔓 Desbloquear LH se status mudou
+                        if (bloqueioAtivoPosPlanejamento) {
+                            desbloquearLHPorStatusSPX(lhId, novoStatusFront.texto);
+                        }
                     }
                     
                     // Adicionar tooltip com informações completas
