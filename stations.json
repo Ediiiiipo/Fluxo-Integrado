@@ -1,6 +1,6 @@
 {
   "versao": "1.0",
-  "atualizado_em": "2026-01-09",
+  "atualizado_em": "2026-03-03",
   "stations": [
     {
       "id": 9798,
@@ -1449,6 +1449,13 @@
       "nome": "LM Hub_SP_SIP_02",
       "codigo": "EXP-02",
       "UF": "SP",
+      "ativo": true
+    },
+    {
+      "id": 5028,
+      "nome": "LM Hub_MG_São José da Lapa",
+      "codigo": "LMG-61",
+      "uf": "MG",
       "ativo": true
     }
   ]
