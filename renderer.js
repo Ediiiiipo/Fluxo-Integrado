@@ -315,6 +315,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // Event Listener - Toggle painel colapsável
     document.getElementById('btnTogglePainel')?.addEventListener('click', togglePainelColapsavel);
     
+    // Event Listener - Hard Reload
+    document.getElementById('btnHardReload')?.addEventListener('click', () => {
+        console.log('🔄 Hard Reload solicitado pelo usuário');
+        const { remote } = require('electron');
+        if (remote && remote.getCurrentWebContents) {
+            remote.getCurrentWebContents().reloadIgnoringCache();
+        } else {
+            // Fallback: limpar cache manualmente e recarregar
+            if (window.caches) {
+                caches.keys().then(names => names.forEach(name => caches.delete(name)));
+            }
+            location.reload(true);
+        }
+    });
+    
     // Event Listeners - Seletor de Data do Ciclo
     document.getElementById('dataCicloSelecionada')?.addEventListener('change', onDataCicloChange);
     document.getElementById('dataCicloSelecionada')?.addEventListener('input', onDataCicloChange); // ✅ Atualizar em tempo real ao mudar data
