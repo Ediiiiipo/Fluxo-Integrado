@@ -1664,8 +1664,11 @@ function sugerirPlanejamentoAutomatico() {
         const faltamAposSelecao = capCiclo - totalSelecionado;
         const percentualFaltante = (faltamAposSelecao / capCiclo) * 100;
         
-        // Só tentar swap se faltar entre 100 e 40% do CAP
-        // Se falta mais de 40%, é muito distante - seguir fluxo normal com TOs
+        // Só tentar swap se:
+        // 1. Falta mais que a tolerância (senão já está bom o suficiente)
+        // 2. Falta no máximo 40% do CAP (senão é muito distante)
+        // 3. Tem LHs selecionadas para trocar
+        // 4. O swap DEVE resultar em distância <= tolerância (senão não vale a pena quebrar FIFO)
         if (faltamAposSelecao > TOLERANCIA_CAP && percentualFaltante <= 40 && lhsSugeridas.length >= 1) {
             console.log(`\n🔄 [OTIMIZAÇÃO] Faltam ${faltamAposSelecao} pedidos (${percentualFaltante.toFixed(1)}%) - verificando swap...`);
             
@@ -1682,14 +1685,23 @@ function sugerirPlanejamentoAutomatico() {
             
             for (let i = 0; i < lhsSugeridas.length; i++) {
                 const lhRemover = lhsSugeridas[i];
+                
+                // 🔥 NUNCA remover LH FULL - prioridade absoluta
+                if (lhRemover.isFull) {
+                    console.log(`   🔥 ${lhRemover.lhTrip} protegida (FULL) - não pode ser removida`);
+                    continue;
+                }
+                
                 const totalSemEla = totalSelecionado - lhRemover.qtdPedidos;
                 
                 for (const lhNova of lhsNaoSelecionadas) {
                     const totalComNova = totalSemEla + lhNova.qtdPedidos;
                     const distanciaComNova = Math.abs(totalComNova - capCiclo);
                     
-                    // Aceitar swap se: resultado mais próximo do CAP E dentro da tolerância
-                    if (distanciaComNova < melhorDistancia && totalComNova <= capCiclo + TOLERANCIA_CAP) {
+                    // Aceitar swap SOMENTE se resultado ficar dentro da tolerância do CAP
+                    // (distância ≤ TOLERANCIA_CAP) E for melhor que o cenário atual
+                    // Isso garante que não quebramos FIFO por micro-otimizações
+                    if (distanciaComNova <= TOLERANCIA_CAP && distanciaComNova < melhorDistancia && totalComNova <= capCiclo + TOLERANCIA_CAP) {
                         melhorSwap = { indiceRemover: i, lhRemover, lhNova, totalComNova, distanciaComNova };
                         melhorDistancia = distanciaComNova;
                     }
