@@ -1612,27 +1612,20 @@ function sugerirPlanejamentoAutomatico() {
                 continue; // Pular esta LH
             }
             
-            // 🔒 LHs normais só entram se couberem no CAP (com tolerância)
-            const TOLERANCIA_CAP = 100; // Permitir ultrapassar até 100 pacotes
+            // 🔒 LHs normais só entram se couberem no CAP
             const cabNoCAP = totalSelecionado + lhInfo.qtdPedidos <= capCiclo;
-            const ultrapassagem = (totalSelecionado + lhInfo.qtdPedidos) - capCiclo;
-            const cabComTolerancia = ultrapassagem > 0 && ultrapassagem <= TOLERANCIA_CAP;
             
-            console.log(`🔍 VERIFICANDO INCLUSÃO: ${lhInfo.lhTrip} | cabNoCAP=${cabNoCAP} | ultrapassagem=${ultrapassagem} | cabComTolerancia=${cabComTolerancia}`);
+            console.log(`🔍 VERIFICANDO INCLUSÃO: ${lhInfo.lhTrip} | cabNoCAP=${cabNoCAP}`);
             
-            if (cabNoCAP || cabComTolerancia) {
-                // LH normal que cabe no CAP (ou ultrapassa dentro da tolerância de 100)
+            if (cabNoCAP) {
+                // LH normal que cabe no CAP
                 lhsSelecionadasPlan.add(lhInfo.lhTrip);
                 lhsSugeridas.push(lhInfo);
                 totalSelecionado += lhInfo.qtdPedidos;
                 
                 if (lhInfo.isBacklogPiso) backlogsPisoSelecionados++;
                 
-                if (cabComTolerancia) {
-                    console.log(`✅ LH ${lhInfo.lhTrip} INCLUÍDA (tolerância +${ultrapassagem} pacotes): ${lhInfo.qtdPedidos} pedidos (corte em ${lhInfo.minutosCorte || '?'} min)`);
-                } else {
-                    console.log(`✅ LH ${lhInfo.lhTrip} INCLUÍDA (cabe no CAP): ${lhInfo.qtdPedidos} pedidos (corte em ${lhInfo.minutosCorte || '?'} min)`);
-                }
+                console.log(`✅ LH ${lhInfo.lhTrip} INCLUÍDA (cabe no CAP): ${lhInfo.qtdPedidos} pedidos (corte em ${lhInfo.minutosCorte || '?'} min)`);
             } else if (totalSelecionado < capCiclo) {
                 // 🎯 FIFO: Próxima LH que não cabe no CAP
                 // Não incluir LH completa, mas marcar para sugestão de TOs
@@ -1644,17 +1637,13 @@ function sugerirPlanejamentoAutomatico() {
                 lhInfo.candidataParaTOs = true;
                 lhInfo.qtdNecessaria = faltam;
                 
-                // Armazenar para sugestão posterior (pode ser limpo pelo swap)
+                // Armazenar para sugestão posterior
                 window.lhCandidataParaTOs = lhInfo;
                 
-                // 💚 MOSTRAR BANNER - adiado para depois do swap (se swap resolver, não mostra)
+                // 💚 MOSTRAR BANNER automaticamente após renderização
                 setTimeout(() => {
-                    if (window.lhCandidataParaTOs) {
-                        console.log(`💚 Banner: Chamando mostrarBannerLHCandidata para ${lhInfo.lhTrip}`);
-                        mostrarBannerLHCandidata(lhInfo, faltam, capCiclo);
-                    } else {
-                        console.log(`💚 Banner cancelado - swap já resolveu o CAP`);
-                    }
+                    console.log(`💚 Banner: Chamando mostrarBannerLHCandidata para ${lhInfo.lhTrip}`);
+                    mostrarBannerLHCandidata(lhInfo, faltam, capCiclo);
                 }, 800);
                 
                 break; // Parar após primeira LH que não cabe (prioridade FIFO)
@@ -1668,85 +1657,6 @@ function sugerirPlanejamentoAutomatico() {
         if (lhsNoPisoComEstouro.length > 0) {
             window.lhsComEstouroPiso = lhsNoPisoComEstouro;
             console.log(`🟡 ${lhsNoPisoComEstouro.length} LH(s) No Piso com estouro tolerado - sugestão de TOs disponível`);
-        }
-        
-        // ============================================
-        // 🔄 OTIMIZAÇÃO PÓS-SELEÇÃO: Swap inteligente
-        // Se ainda falta muito volume, verificar se trocar a última LH 
-        // por uma LH maior resultaria em total mais próximo do CAP
-        // ============================================
-        const TOLERANCIA_CAP = 100;
-        const faltamAposSelecao = capCiclo - totalSelecionado;
-        const percentualFaltante = (faltamAposSelecao / capCiclo) * 100;
-        
-        // Só tentar swap se:
-        // 1. Falta mais que a tolerância (senão já está bom o suficiente)
-        // 2. Falta no máximo 40% do CAP (senão é muito distante)
-        // 3. Tem LHs selecionadas para trocar
-        // 4. O swap DEVE resultar em distância <= tolerância (senão não vale a pena quebrar FIFO)
-        if (faltamAposSelecao > TOLERANCIA_CAP && percentualFaltante <= 40 && lhsSugeridas.length >= 1) {
-            console.log(`\n🔄 [OTIMIZAÇÃO] Faltam ${faltamAposSelecao} pedidos (${percentualFaltante.toFixed(1)}%) - verificando swap...`);
-            
-            // LHs que não foram selecionadas (e não são bloqueadas/P3)
-            const lhsNaoSelecionadas = lhsComInfo.filter(lh => 
-                !lhsSelecionadasPlan.has(lh.lhTrip) && 
-                lh.statusLH?.codigo !== 'P3' && 
-                !(lh.minutosCorte !== null && lh.minutosCorte < 0)
-            );
-            
-            // Testar substituir cada LH selecionada por cada não-selecionada
-            let melhorSwap = null;
-            let melhorDistancia = faltamAposSelecao; // distância atual do CAP
-            
-            for (let i = 0; i < lhsSugeridas.length; i++) {
-                const lhRemover = lhsSugeridas[i];
-                
-                // 🔥 NUNCA remover LH FULL - prioridade absoluta
-                if (lhRemover.isFull) {
-                    console.log(`   🔥 ${lhRemover.lhTrip} protegida (FULL) - não pode ser removida`);
-                    continue;
-                }
-                
-                const totalSemEla = totalSelecionado - lhRemover.qtdPedidos;
-                
-                for (const lhNova of lhsNaoSelecionadas) {
-                    const totalComNova = totalSemEla + lhNova.qtdPedidos;
-                    const distanciaComNova = Math.abs(totalComNova - capCiclo);
-                    
-                    // Aceitar swap SOMENTE se resultado ficar dentro da tolerância do CAP
-                    // (distância ≤ TOLERANCIA_CAP) E for melhor que o cenário atual
-                    // Isso garante que não quebramos FIFO por micro-otimizações
-                    if (distanciaComNova <= TOLERANCIA_CAP && distanciaComNova < melhorDistancia && totalComNova <= capCiclo + TOLERANCIA_CAP) {
-                        melhorSwap = { indiceRemover: i, lhRemover, lhNova, totalComNova, distanciaComNova };
-                        melhorDistancia = distanciaComNova;
-                    }
-                }
-            }
-            
-            if (melhorSwap) {
-                console.log(`✅ [OTIMIZAÇÃO] SWAP encontrado!`);
-                console.log(`   Remover: ${melhorSwap.lhRemover.lhTrip} (${melhorSwap.lhRemover.qtdPedidos} pedidos)`);
-                console.log(`   Adicionar: ${melhorSwap.lhNova.lhTrip} (${melhorSwap.lhNova.qtdPedidos} pedidos)`);
-                console.log(`   Novo total: ${melhorSwap.totalComNova.toLocaleString('pt-BR')} (distância do CAP: ${melhorSwap.distanciaComNova})`);
-                console.log(`   Total anterior: ${totalSelecionado.toLocaleString('pt-BR')} (distância do CAP: ${faltamAposSelecao})`);
-                
-                // Aplicar swap
-                const lhRemovida = lhsSugeridas.splice(melhorSwap.indiceRemover, 1)[0];
-                lhsSelecionadasPlan.delete(lhRemovida.lhTrip);
-                totalSelecionado -= lhRemovida.qtdPedidos;
-                
-                lhsSugeridas.push(melhorSwap.lhNova);
-                lhsSelecionadasPlan.add(melhorSwap.lhNova.lhTrip);
-                totalSelecionado += melhorSwap.lhNova.qtdPedidos;
-                
-                // Limpar candidata de TOs se o swap resolveu
-                if (totalSelecionado >= capCiclo - TOLERANCIA_CAP) {
-                    window.lhCandidataParaTOs = null;
-                    window.lhComplementoSugerida = null;
-                }
-            } else {
-                console.log(`ℹ️ [OTIMIZAÇÃO] Nenhum swap melhora a situação`);
-            }
         }
         
         console.log(`✅ LHs selecionadas: ${lhsSugeridas.length}`);
@@ -1890,8 +1800,7 @@ function sugerirPlanejamentoAutomatico() {
     console.log('═'.repeat(50));
     
     // 💬 MOSTRAR BANNER VERDE se houver LH candidata para complemento
-    // (Não mostrar se swap já resolveu - window.lhCandidataParaTOs será null)
-    if (window.lhComplementoSugerida && window.lhCandidataParaTOs) {
+    if (window.lhComplementoSugerida) {
         const lhCandidata = window.lhComplementoSugerida;
         const faltam = lhCandidata.faltam;
         
@@ -1902,8 +1811,6 @@ function sugerirPlanejamentoAutomatico() {
         setTimeout(() => {
             mostrarBannerLHCandidata(lhCandidata, faltam, capCiclo);
         }, 500);
-    } else if (!window.lhCandidataParaTOs) {
-        console.log(`💚 Banner não exibido - swap resolveu o CAP`);
     }
     
     // 🔒 BLOQUEAR LHs NÃO SUGERIDAS
@@ -3200,6 +3107,23 @@ function atualizarCardsCiclos(ciclosStation, capacidadeStation) {
                 }
             });
             
+            // 🌙 AUTO-AJUSTAR DATA se ciclo noturno e botão Hoje ativo
+            if (cicloSelecionado !== 'Todos') {
+                const dataExpedicaoCorreta = calcularDataExpedicaoHoje(new Date());
+                const inputData = document.getElementById('dataCicloSelecionada');
+                if (inputData) {
+                    const dataAtualInput = inputData.value;
+                    const dataCorretaFormatada = dataExpedicaoCorreta.toISOString().split('T')[0];
+                    
+                    if (dataAtualInput !== dataCorretaFormatada) {
+                        console.log(`📅 🌙 Auto-ajustando data: ${dataAtualInput} → ${dataCorretaFormatada} (ciclo ${cicloSelecionado})`);
+                        inputData.value = dataCorretaFormatada;
+                        dataCicloSelecionada = dataExpedicaoCorreta;
+                        atualizarInfoCiclos();
+                    }
+                }
+            }
+            
             // Re-renderizar tabela
             renderizarTabelaPlanejamento();
         });
@@ -3249,18 +3173,26 @@ function onDataCicloChange(e) {
     }
 }
 
-// Definir data do ciclo como hoje
+// Definir data do ciclo como hoje (ou amanhã se ciclo noturno já iniciou)
 function setDataCicloHoje() {
     const inputData = document.getElementById('dataCicloSelecionada');
     if (inputData) {
-        const hoje = new Date();
-        const dataFormatada = hoje.toISOString().split('T')[0];
+        let hoje = new Date();
         
-        console.log('📅 [HOJE] Definindo data como:', hoje.toLocaleDateString('pt-BR'), '(', dataFormatada, ')');
+        // 🌙 VERIFICAR SE CICLO SELECIONADO ATRAVESSA MEIA-NOITE
+        // Se sim e já estamos na janela noturna, a data de expedição é AMANHÃ
+        const dataExpedicao = calcularDataExpedicaoHoje(hoje);
+        
+        const dataFormatada = dataExpedicao.toISOString().split('T')[0];
+        
+        console.log('📅 [HOJE] Definindo data como:', dataExpedicao.toLocaleDateString('pt-BR'), '(', dataFormatada, ')');
+        if (dataExpedicao.getDate() !== hoje.getDate()) {
+            console.log('📅 [HOJE] 🌙 Ciclo noturno detectado - usando data de expedição AMANHÃ');
+        }
         
         // Atualizar valor do input
         inputData.value = dataFormatada;
-        dataCicloSelecionada = hoje;
+        dataCicloSelecionada = dataExpedicao;
         
         // ✅ AGUARDAR DOM ATUALIZAR antes de disparar evento
         setTimeout(() => {
@@ -3271,6 +3203,67 @@ function setDataCicloHoje() {
             inputData.dispatchEvent(event);
         }, 0);
     }
+}
+
+// 🌙 Calcular data de expedição correta considerando ciclos noturnos
+function calcularDataExpedicaoHoje(agora) {
+    agora = agora || new Date();
+    const horaAtual = agora.getHours();
+    const minutoAtual = agora.getMinutes();
+    
+    // Buscar horários do ciclo selecionado no OpsClock
+    if (cicloSelecionado && cicloSelecionado !== 'Todos' && dadosOpsClock.length > 0) {
+        const stationSelecionada = stationAtualNome || '';
+        const stationBase = stationSelecionada.toLowerCase().replace(/lm\s*hub[_\s]*/gi, '').replace(/[_\s]+/g, '');
+        
+        const cicloInfo = dadosOpsClock.find(item => {
+            const stationName = item['Station name'] || item['Station Name'] || '';
+            const itemNorm = stationName.toLowerCase().replace(/lm\s*hub[_\s]*/gi, '').replace(/[_\s]+/g, '');
+            const dispatchWindow = item['Dispatch Window'] || '';
+            const status = item['Status'] || '';
+            
+            const isActive = status.includes('Active');
+            const hasStation = itemNorm.length > 0;
+            const matchStation = hasStation && (itemNorm === stationBase || itemNorm.includes(stationBase) || stationBase.includes(itemNorm));
+            const matchCiclo = dispatchWindow.toUpperCase() === cicloSelecionado.toUpperCase();
+            
+            return isActive && matchStation && matchCiclo;
+        });
+        
+        if (cicloInfo) {
+            const startTime = cicloInfo['Start time2'] || cicloInfo['Start time'] || '';
+            const endTime = cicloInfo['End time2'] || cicloInfo['End time'] || '';
+            
+            const horaInicio = parseInt(startTime.split(':')[0]);
+            const horaFim = parseInt(endTime.split(':')[0]);
+            
+            // Detectar se atravessa meia-noite (ex: 20:00 - 01:00, 23:00 - 01:00)
+            const atravessaMeiaNoite = horaInicio > horaFim;
+            
+            if (atravessaMeiaNoite) {
+                // 🌙 Ciclo noturno: a expedição (sorting/dispatch) SEMPRE acontece após meia-noite
+                // Portanto a data de expedição é SEMPRE amanhã, independente do horário atual
+                // Exceção: se já estamos na madrugada (ex: 00:30) e o ciclo termina depois (01:00)
+                // nesse caso a expedição é HOJE (já virou o dia)
+                if (horaAtual < horaFim) {
+                    // Estamos na madrugada (ex: 00:30 do dia 06) → expedição é hoje mesmo
+                    console.log(`📅 [HOJE] 🌙 Ciclo ${cicloSelecionado} (${startTime}-${endTime}) - madrugada. Hora: ${horaAtual}:${minutoAtual.toString().padStart(2,'0')} < ${endTime} → expedição HOJE`);
+                } else {
+                    // Qualquer hora do dia (manhã, tarde ou noite) → expedição amanhã
+                    const amanha = new Date(agora);
+                    amanha.setDate(amanha.getDate() + 1);
+                    amanha.setHours(0, 0, 0, 0);
+                    console.log(`📅 [HOJE] 🌙 Ciclo ${cicloSelecionado} (${startTime}-${endTime}) noturno → expedição AMANHÃ (${amanha.toLocaleDateString('pt-BR')})`);
+                    return amanha;
+                }
+            }
+        }
+    }
+    
+    // Caso padrão: data de hoje
+    const hoje = new Date(agora);
+    hoje.setHours(0, 0, 0, 0);
+    return hoje;
 }
 
 // Obter data do ciclo selecionada (ou hoje se não houver)
