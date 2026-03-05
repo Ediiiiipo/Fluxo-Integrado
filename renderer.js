@@ -3107,16 +3107,21 @@ function atualizarCardsCiclos(ciclosStation, capacidadeStation) {
                 }
             });
             
-            // 🌙 AUTO-AJUSTAR DATA se ciclo noturno e botão Hoje ativo
+            // 🌙 AUTO-AJUSTAR DATA apenas se ciclo noturno (atravessa meia-noite)
             if (cicloSelecionado !== 'Todos') {
                 const dataExpedicaoCorreta = calcularDataExpedicaoHoje(new Date());
                 const inputData = document.getElementById('dataCicloSelecionada');
                 if (inputData) {
                     const dataAtualInput = inputData.value;
                     const dataCorretaFormatada = dataExpedicaoCorreta.toISOString().split('T')[0];
+                    const hojeFormatado = new Date().toISOString().split('T')[0];
                     
-                    if (dataAtualInput !== dataCorretaFormatada) {
-                        console.log(`📅 🌙 Auto-ajustando data: ${dataAtualInput} → ${dataCorretaFormatada} (ciclo ${cicloSelecionado})`);
+                    // Só auto-ajustar se o ciclo é noturno (data calculada != hoje)
+                    // Para ciclos diurnos, manter a data que o usuário escolheu
+                    const ehCicloNoturno = dataCorretaFormatada !== hojeFormatado;
+                    
+                    if (ehCicloNoturno && dataAtualInput !== dataCorretaFormatada) {
+                        console.log(`📅 🌙 Auto-ajustando data: ${dataAtualInput} → ${dataCorretaFormatada} (ciclo noturno ${cicloSelecionado})`);
                         inputData.value = dataCorretaFormatada;
                         dataCicloSelecionada = dataExpedicaoCorreta;
                         atualizarInfoCiclos();
@@ -4010,12 +4015,14 @@ function parsePrevisaoParaTimestamp(previsaoStr) {
 function isLixoSistemico(rowData) {
     // ✅ NOVA LÓGICA: Identificar LHs não encontradas na planilha SPX
     // Se a LH não foi encontrada (dadosPlanilhaLH === null), considerar lixo sistêmico
+    // EXCEÇÃO: LHs FM (FMHub) nunca são lixo - são movimentações internas válidas
     const naoEncontrada = !rowData.dadosPlanilhaLH || rowData.encontrada === false;
     const pedidos = rowData.pedidos || 0;
     const poucosPedidos = pedidos <= 2;
+    const ehFM = rowData.isFM || rowData.tipo === 'FM';
     
-    // Se não foi encontrada na planilha E tem poucos pedidos, é lixo
-    if (naoEncontrada && poucosPedidos) {
+    // Se não foi encontrada na planilha E tem poucos pedidos E NÃO é FM, é lixo
+    if (naoEncontrada && poucosPedidos && !ehFM) {
         console.log(`🗑️ Lixo sistêmico detectado (não encontrada): ${rowData.lh_trip}`, {
             encontrada: rowData.encontrada,
             pedidos
@@ -4187,14 +4194,29 @@ function renderizarTabelaPlanejamento() {
         const complementoSugerido = window.lhComplementoSugerida && 
                                     window.lhComplementoSugerida.lhTrip === lhTrip;
         
+        // Detectar LH FM (movimentação interna - FMHub_LHTransporting/FMHub_LHTransported)
+        const pedidosLH = lhTripsPlanejáveis[lhTrip] || [];
+        const colunaStatusFM = Object.keys(pedidosLH[0] || {}).find(col => 
+            col.toLowerCase() === 'status' || col.toLowerCase().includes('status')
+        ) || 'Status';
+        const isFM = pedidosLH.length > 0 && pedidosLH.some(p => {
+            const st = (p[colunaStatusFM] || '').toLowerCase();
+            return st.includes('fmhub');
+        });
+        
+        if (isFM) {
+            console.log(`🏭 LH FM detectada: ${lhTrip} (${qtdPedidos} pedidos)`);
+        }
+
         // Montar objeto com dados para filtro
         const rowData = {
-            tipo: isFull ? 'FULL' : 'Normal',
+            tipo: isFull ? 'FULL' : (isFM ? 'FM' : 'Normal'),
             status: encontrada ? 'Encontrada' : 'Não encontrada',
             lh_trip: lhTrip,
             pedidos: qtdPedidos,
             pedidos_tos: calcularTotalTOsSelecionadas(lhTrip),
             isFull,
+            isFM,
             encontrada,
             dadosPlanilhaLH,
             estouroPiso,         // Flag para destaque visual (LH no piso com estouro)
@@ -4474,7 +4496,8 @@ function renderizarTabelaPlanejamento() {
         const isFBS = valorOriginBadge && typeof valorOriginBadge === 'string' && 
                       valorOriginBadge.toUpperCase().startsWith('FBS_');
         const badgeFull = isFBS ? '<span class="badge-full">⚡ FULL</span>' : '<span class="badge-full">⭐ FULL</span>';
-        html += `<td>${row.isFull ? badgeFull : '<span class="badge-normal">Normal</span>'}</td>`;
+        const badgeFM = '<span class="badge-fm" style="background: linear-gradient(135deg, #9C27B0, #673AB7); color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">🏭 FM</span>';
+        html += `<td>${row.isFull ? badgeFull : (row.isFM ? badgeFM : '<span class="badge-normal">Normal</span>')}</td>`;
         html += `<td class="${row.encontrada ? 'status-encontrada' : 'status-nao-encontrada'}">${row.encontrada ? '✅' : '❌'}</td>`;
         html += `<td class="lh-trip-cell">${row.lh_trip}</td>`;
         html += `<td>${row.pedidos}</td>`;
