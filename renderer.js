@@ -13,6 +13,7 @@ const { traduzirErroParaUsuario } = require('./renderer_error_translator.js');
 // ======================= ESTADO GLOBAL =======================
 let dadosAtuais = []; // Todos os pedidos carregados
 let timestampInicioPlanejamento = null; // ⏱️ Timestamp de início (quando baixa o saldo SPX)
+let timestampConfirmarGerar = null;    // ⏱️ Timestamp de quando clica em "Confirmar e Gerar"
 let lhTrips = {}; // Agrupamento por LH Trip
 let lhTripAtual = null; // LH Trip selecionada na aba principal
 let stationsCadastradas = []; // Lista de stations
@@ -2210,6 +2211,10 @@ function atualizarCardSugestao() {
 
 // Confirmar sugestão e gerar planejamento
 async function confirmarSugestaoEGerar() {
+    // ⏱️ Registrar hora do clique em "Confirmar e Gerar"
+    timestampConfirmarGerar = new Date();
+    console.log(`⏱️ [TIMER] Confirmar e Gerar clicado: ${timestampConfirmarGerar.toLocaleTimeString('pt-BR')}`);
+
     // Verificar se tem seleção
     const totalLHs = lhsSelecionadasPlan.size;
     const totalBacklog = pedidosBacklogSelecionados.size;

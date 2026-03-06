@@ -106,7 +106,9 @@ async function enviarLogPlanejamento(dadosRelatorio) {
             pedidosTotais: dadosRelatorio.pedidosTotais,
             pedidosPlanejados: dadosRelatorio.pedidosPlanejados,
             quantidadeLHs: dadosRelatorio.quantidadeLHs,
-            backlog: dadosRelatorio.backlog
+            backlog: dadosRelatorio.backlog,
+            horaBaixarDados: dadosRelatorio.horaBaixarDados,
+            horaConfirmarGerar: dadosRelatorio.horaConfirmarGerar
             // versão será adicionada no main.js
         };
         
@@ -146,6 +148,14 @@ function extrairDadosRelatorio() {
     // Quantidade de LHs
     const quantidadeLHs = lhsSelecionadasPlan.size;
     
+    // Timestamps dos botões principais
+    const horaBaixarDados = timestampInicioPlanejamento
+        ? timestampInicioPlanejamento.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        : 'N/A';
+    const horaConfirmarGerar = timestampConfirmarGerar
+        ? timestampConfirmarGerar.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        : 'N/A';
+
     return {
         estacao,
         ciclo,
@@ -154,7 +164,9 @@ function extrairDadosRelatorio() {
         pedidosTotais,
         pedidosPlanejados,
         quantidadeLHs,
-        backlog
+        backlog,
+        horaBaixarDados,
+        horaConfirmarGerar
     };
 }
 
