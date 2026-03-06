@@ -717,7 +717,7 @@ body {
 .splash-shopito {
   position: relative;
   z-index: 11;
-  margin-bottom: -100px;
+  margin-bottom: -120px;
   animation: shopitoIn 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) 0.15s both;
 }
 
@@ -726,16 +726,16 @@ body {
 }
 
 .shopito-img {
-  width: 460px;
+  width: 540px;
   filter: drop-shadow(0 24px 56px rgba(0, 0, 0, 0.45));
   display: block;
 }
 
 /* Card maior, centralizado */
 .splash-card {
-  padding-top: 110px !important;
-  min-width: 620px;
-  max-width: 700px;
+  padding-top: 130px !important;
+  min-width: 860px;
+  max-width: 940px;
 }
 
 @keyframes shopitoIn {
