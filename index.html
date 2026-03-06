@@ -781,14 +781,24 @@
   <body>
     <!-- SPLASH SCREEN -->
     <div id="splashScreen" class="splash-screen">
-      <div class="splash-content">
+      <!-- Blobs de fundo aurora -->
+      <div class="splash-blob splash-blob-1"></div>
+      <div class="splash-blob splash-blob-2"></div>
+      <div class="splash-blob splash-blob-3"></div>
+
+      <!-- Card central glassmorphism -->
+      <div class="splash-card">
         <div class="splash-logo">
+          <div class="splash-logo-glow"></div>
           <img src="shopee-logo.png" alt="Shopee Logo" class="shopee-logo-img" />
         </div>
         <p class="splash-greeting" id="splashGreeting">Bom dia!</p>
         <h1 class="splash-title">Planejamento Fluxo Integrado</h1>
         <p class="splash-subtitle">Planejamento inteligente para operações eficientes</p>
-        <button class="splash-button" id="btnIniciar">✨ Iniciar</button>
+        <div class="splash-progress-wrap">
+          <div class="splash-progress-bar"></div>
+        </div>
+        <button class="splash-button" id="btnIniciar">Iniciar <span class="splash-arrow">→</span></button>
       </div>
     </div>
 
