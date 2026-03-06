@@ -12,6 +12,7 @@ const { traduzirErroParaUsuario } = require('./renderer_error_translator.js');
 
 // ======================= ESTADO GLOBAL =======================
 let dadosAtuais = []; // Todos os pedidos carregados
+let timestampInicioPlanejamento = null; // ⏱️ Timestamp de início (quando baixa o saldo SPX)
 let lhTrips = {}; // Agrupamento por LH Trip
 let lhTripAtual = null; // LH Trip selecionada na aba principal
 let stationsCadastradas = []; // Lista de stations
@@ -674,6 +675,10 @@ async function salvarStations() {
 
 // ======================= DOWNLOAD =======================
 async function iniciarDownload() {
+    // ⏱️ Registrar início do planejamento
+    timestampInicioPlanejamento = new Date();
+    console.log(`⏱️ [TIMER] Início do planejamento: ${timestampInicioPlanejamento.toLocaleTimeString('pt-BR')}`);
+    
     // Tentar pegar do autocomplete primeiro, depois do select antigo
     let stationSelecionada = document.getElementById('stationSelecionada')?.value ||
         document.getElementById('stationSearchInput')?.value ||
@@ -741,6 +746,10 @@ if (typeof ipcRenderer !== 'undefined') {
 }
 
 async function selecionarArquivo() {
+    // ⏱️ Registrar início do planejamento
+    timestampInicioPlanejamento = new Date();
+    console.log(`⏱️ [TIMER] Início do planejamento (seleção manual): ${timestampInicioPlanejamento.toLocaleTimeString('pt-BR')}`);
+    
     try {
         const resultado = await ipcRenderer.invoke('selecionar-arquivo');
 
@@ -3107,28 +3116,6 @@ function atualizarCardsCiclos(ciclosStation, capacidadeStation) {
                 }
             });
             
-            // 🌙 AUTO-AJUSTAR DATA apenas se ciclo noturno (atravessa meia-noite)
-            if (cicloSelecionado !== 'Todos') {
-                const dataExpedicaoCorreta = calcularDataExpedicaoHoje(new Date());
-                const inputData = document.getElementById('dataCicloSelecionada');
-                if (inputData) {
-                    const dataAtualInput = inputData.value;
-                    const dataCorretaFormatada = dataExpedicaoCorreta.toISOString().split('T')[0];
-                    const hojeFormatado = new Date().toISOString().split('T')[0];
-                    
-                    // Só auto-ajustar se o ciclo é noturno (data calculada != hoje)
-                    // Para ciclos diurnos, manter a data que o usuário escolheu
-                    const ehCicloNoturno = dataCorretaFormatada !== hojeFormatado;
-                    
-                    if (ehCicloNoturno && dataAtualInput !== dataCorretaFormatada) {
-                        console.log(`📅 🌙 Auto-ajustando data: ${dataAtualInput} → ${dataCorretaFormatada} (ciclo noturno ${cicloSelecionado})`);
-                        inputData.value = dataCorretaFormatada;
-                        dataCicloSelecionada = dataExpedicaoCorreta;
-                        atualizarInfoCiclos();
-                    }
-                }
-            }
-            
             // Re-renderizar tabela
             renderizarTabelaPlanejamento();
         });
@@ -3154,8 +3141,12 @@ function inicializarDataCiclo() {
     const inputData = document.getElementById('dataCicloSelecionada');
     if (inputData) {
         const hoje = new Date();
-        const dataFormatada = hoje.toISOString().split('T')[0]; // YYYY-MM-DD
+        const ano = hoje.getFullYear();
+        const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+        const dia = String(hoje.getDate()).padStart(2, '0');
+        const dataFormatada = `${ano}-${mes}-${dia}`; // Formato local, sem UTC
         inputData.value = dataFormatada;
+        hoje.setHours(0, 0, 0, 0);
         dataCicloSelecionada = hoje;
     }
 }
@@ -3184,20 +3175,18 @@ function setDataCicloHoje() {
     if (inputData) {
         let hoje = new Date();
         
-        // 🌙 VERIFICAR SE CICLO SELECIONADO ATRAVESSA MEIA-NOITE
-        // Se sim e já estamos na janela noturna, a data de expedição é AMANHÃ
-        const dataExpedicao = calcularDataExpedicaoHoje(hoje);
+        // 📅 Data inicial SEMPRE é hoje - o usuário muda manualmente se quiser
+        const ano = hoje.getFullYear();
+        const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+        const dia = String(hoje.getDate()).padStart(2, '0');
+        const dataFormatada = `${ano}-${mes}-${dia}`;
         
-        const dataFormatada = dataExpedicao.toISOString().split('T')[0];
-        
-        console.log('📅 [HOJE] Definindo data como:', dataExpedicao.toLocaleDateString('pt-BR'), '(', dataFormatada, ')');
-        if (dataExpedicao.getDate() !== hoje.getDate()) {
-            console.log('📅 [HOJE] 🌙 Ciclo noturno detectado - usando data de expedição AMANHÃ');
-        }
+        console.log('📅 [HOJE] Definindo data como:', hoje.toLocaleDateString('pt-BR'), '(', dataFormatada, ')');
         
         // Atualizar valor do input
         inputData.value = dataFormatada;
-        dataCicloSelecionada = dataExpedicao;
+        hoje.setHours(0, 0, 0, 0);
+        dataCicloSelecionada = hoje;
         
         // ✅ AGUARDAR DOM ATUALIZAR antes de disparar evento
         setTimeout(() => {
@@ -7170,9 +7159,25 @@ function gerarRelatorioFinal() {
             }
         }
         
-        // Calcular tempo REAL de execução
-        let tempoFormatado = '0s';
-        if (tempoInicioExecucao && tempoFimExecucao) {
+        // Calcular tempo REAL de planejamento (do download do saldo até gerar relatório)
+        let tempoFormatado = '-';
+        if (timestampInicioPlanejamento) {
+            const agora = Date.now();
+            const segundosTotal = Math.floor((agora - timestampInicioPlanejamento.getTime()) / 1000);
+            const horas = Math.floor(segundosTotal / 3600);
+            const minutos = Math.floor((segundosTotal % 3600) / 60);
+            const segundos = segundosTotal % 60;
+            
+            if (horas > 0) {
+                tempoFormatado = `${horas}h ${minutos}m`;
+            } else if (minutos > 0) {
+                tempoFormatado = segundos > 0 ? `${minutos}m ${segundos}s` : `${minutos}m`;
+            } else {
+                tempoFormatado = `${segundos}s`;
+            }
+            console.log(`⏱️ [RELATÓRIO] Tempo de planejamento: ${tempoFormatado} (início: ${timestampInicioPlanejamento.toLocaleTimeString('pt-BR')})`);
+        } else if (tempoInicioExecucao && tempoFimExecucao) {
+            // Fallback: usar tempo da sugestão automática se não tiver timestamp de download
             const segundosTotal = Math.floor((tempoFimExecucao - tempoInicioExecucao) / 1000);
             const minutos = Math.floor(segundosTotal / 60);
             const segundos = segundosTotal % 60;
