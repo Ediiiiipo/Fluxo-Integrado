@@ -1124,7 +1124,8 @@ class ShopeeDownloader {
       for (const arquivo of arquivos) {
         const workbook = XLSX.readFile(arquivo);
         const data = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-        dadosUnificados = dadosUnificados.concat(data);
+        const dataFiltrada = data.filter(row => (row['Destination Hub'] || '').toString().startsWith('LM Hub'));
+        dadosUnificados = dadosUnificados.concat(dataFiltrada);
       }
 
       this.log(`✔ ${arquivos.length} arquivos unificados`, 'success');
@@ -1148,15 +1149,20 @@ class ShopeeDownloader {
 
     const workbook = XLSX.readFile(filePath);
     const data = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+    const dataFiltrada = data.filter(row => (row['Destination Hub'] || '').toString().startsWith('LM Hub'));
 
     const finalPath = path.join(outputDir, `Relatorio_${new Date().toISOString().split('T')[0]}.xlsx`);
-    await fs.copy(filePath, finalPath);
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(dataFiltrada);
+    XLSX.utils.book_append_sheet(wb, ws, 'Filtrado');
+    XLSX.writeFile(wb, finalPath);
 
     this.log(`✅ Arquivo salvo: ${finalPath}`, 'success');
 
     return {
       filePath: finalPath,
-      totalRecords: data.length,
+      totalRecords: dataFiltrada.length,
       outputDir
     };
   }
