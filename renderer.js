@@ -6001,57 +6001,7 @@ function confirmarSelecaoTOs() {
 // Função auxiliar para obter capacidade do ciclo atual
 function obterCapacidadeCicloAtual() {
     if (!cicloSelecionado || cicloSelecionado === 'Todos') return 0;
-    
-    // VERIFICAR CAP MANUAL PRIMEIRO
-    const capManual = obtemCapManual(cicloSelecionado);
-    if (capManual !== null) {
-        console.log('✅ Usando CAP Manual no modal:', cicloSelecionado, '=', capManual);
-        return capManual;
-    }
-    
-    // Se não tem CAP Manual, pegar do Google Sheets
-    const stationSelecionada = stationAtualNome || '';
-    const stationBase = stationSelecionada.toLowerCase().replace(/lm\s*hub[_\s]*/gi, '').replace(/[_\s]+/g, '');
-    
-    const capacidadeStation = dadosOutbound.filter(item => {
-        const sortCodeName = item['Sort Code Name'] || item['sort_code_name'] || '';
-        const itemNorm = sortCodeName.toLowerCase().replace(/lm\s*hub[_\s]*/gi, '').replace(/[_\s]+/g, '');
-        return itemNorm.includes(stationBase) || stationBase.includes(itemNorm);
-    });
-    
-    const registroCiclo = capacidadeStation.find(cap => {
-        const tipoCap = cap['Type Outbound'] || cap['type_outbound'] || '';
-        return tipoCap.toUpperCase() === cicloSelecionado.toUpperCase();
-    });
-    
-    if (!registroCiclo) return 0;
-    
-    const dataCiclo = getDataCicloSelecionada();
-    const diaHoje = String(dataCiclo.getDate()).padStart(2, '0');
-    const diaSemZero = String(dataCiclo.getDate());
-    const mesHoje = String(dataCiclo.getMonth() + 1).padStart(2, '0');
-    const mesSemZero = String(dataCiclo.getMonth() + 1);
-    const anoHoje = dataCiclo.getFullYear();
-    const anoCurto = String(anoHoje).slice(2);
-    
-    const formatosData = [
-        `${diaHoje}/${mesHoje}/${anoHoje}`,
-        `${diaSemZero}/${mesSemZero}/${anoHoje}`,
-        `${diaHoje}/${mesHoje}/${anoCurto}`,
-        `${anoHoje}-${mesHoje}-${diaHoje}`,
-    ];
-    
-    for (const formato of formatosData) {
-        if (registroCiclo[formato] !== undefined && registroCiclo[formato] !== '') {
-            let valor = registroCiclo[formato];
-            if (typeof valor === 'string') {
-                valor = valor.replace(/\./g, '').replace(',', '.');
-            }
-            return parseFloat(valor) || 0;
-        }
-    }
-    
-    return 0;
+    return obterCapacidadeCiclo(cicloSelecionado);
 }
 
 // Calcular total selecionado (LHs + Backlog, considerando TOs parciais)
